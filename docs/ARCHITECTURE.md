@@ -17,7 +17,7 @@ CrossSpec extracts immutable claim records from common business artifacts (PDF, 
 5. **Optional tagging**: if enabled, LLM tagging adds a `facets` object constrained by taxonomy.
 
 ## Key modules and responsibilities
-- `src/crossspec/cli.py`: CLI entrypoint (`extract`, `index`, `analyze`).
+- `src/crossspec/cli.py`: CLI entrypoint (`extract`, `index`, `analyze`, `demo`).
 - `src/crossspec/config.py`: YAML config parsing into typed models.
 - `src/crossspec/claims.py`: claim schema, ID generator, claim construction.
 - `src/crossspec/normalize.py`: `normalize_light` implementation.
@@ -51,4 +51,9 @@ CrossSpec extracts immutable claim records from common business artifacts (PDF, 
 make smoke
 ```
 
-This runs extraction using `samples/crossspec.yml`, prints the first 3 JSONL lines, and validates that each line can be parsed as a `Claim`.
+## Demo
+```bash
+crossspec demo --config samples/crossspec.yml
+```
+
+This generates small sample artifacts, runs extraction, and prints a summary.

@@ -17,7 +17,7 @@ CrossSpec は、業務ドキュメントから不変のクレーム（Claim）�
 5. **任意タグ付け**: タクソノミーに従って facets を付与
 
 ## 主要モジュール
-- `src/crossspec/cli.py`: CLI エントリポイント
+- `src/crossspec/cli.py`: CLI エントリポイント（`extract`, `index`, `analyze`, `demo`）
 - `src/crossspec/config.py`: YAML 設定の読み込み
 - `src/crossspec/claims.py`: Claim スキーマと ID 生成
 - `src/crossspec/normalize.py`: `normalize_light`
@@ -50,3 +50,10 @@ CrossSpec は、業務ドキュメントから不変のクレーム（Claim）�
 ```bash
 make smoke
 ```
+
+## デモ
+```bash
+crossspec demo --config samples/crossspec.yml
+```
+
+サンプルデータを生成し、抽出結果のサマリを出力します。

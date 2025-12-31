@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import glob
 from pathlib import Path
+import sys
 from typing import Iterable, List, Optional
 
 try:
@@ -41,6 +42,9 @@ if typer:
     def extract(config: str = typer.Option(..., "--config", help="Path to config YAML")) -> None:
         extract_command(config)
 
+    @app.command()
+    def demo(config: str = typer.Option(..., "--config", help="Path to config YAML")) -> None:
+        demo_command(config)
 
     @app.command()
     def index() -> None:
@@ -128,6 +132,67 @@ def _build_extractor(source: KnowledgeSource, path: Path):
     raise ValueError(f"Unsupported source type: {source.type}")
 
 
+def demo_command(config: str) -> None:
+    cfg = load_config(config)
+    _run_demo(cfg)
+
+
+def _run_demo(cfg: CrossspecConfig) -> None:
+    from collections import Counter
+    import subprocess
+
+    samples_script = Path("samples/generate_samples.py")
+    if samples_script.exists():
+        subprocess.run([sys.executable, str(samples_script)], check=True)
+    else:
+        print("samples/generate_samples.py not found; skipping sample generation.")
+
+    output_path = Path(cfg.outputs.claims_dir) / cfg.outputs.jsonl_filename
+    claims = list(_extract_claims(cfg))
+    write_jsonl(output_path, claims)
+    print(f"Wrote {len(claims)} claims to {output_path}")
+
+    by_source = Counter(claim.source.type for claim in claims)
+    by_authority = Counter(getattr(claim.authority, "value", str(claim.authority)) for claim in claims)
+    feature_counts = Counter()
+    has_facets = False
+    for claim in claims:
+        if claim.facets and isinstance(claim.facets, dict):
+            features = []
+            if "feature" in claim.facets:
+                features = claim.facets.get("feature") or []
+            else:
+                for value in claim.facets.values():
+                    if isinstance(value, dict) and "feature" in value:
+                        features = value.get("feature") or []
+                        break
+            if features:
+                has_facets = True
+                feature_counts.update(features)
+
+    print("Counts by source.type:")
+    for key, value in by_source.items():
+        print(f"  {key}: {value}")
+    print("Counts by authority:")
+    for key, value in by_authority.items():
+        print(f"  {key}: {value}")
+    if has_facets:
+        print("Counts by facets.feature:")
+        for key, value in feature_counts.items():
+            print(f"  {key}: {value}")
+    else:
+        print("Counts by facets.feature: no facets")
+
+    print("Sample claims:")
+    if not claims:
+        print("  (no claims found)")
+        return
+    for claim in claims[:3]:
+        text_preview = claim.text_raw.replace("\n", " ")[:120]
+        print(f"  {claim.claim_id} | {claim.source.path} | {claim.provenance}")
+        print(f"    {text_preview}")
+
+
 def main() -> None:
     if typer and app:
         app()
@@ -138,11 +203,15 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command")
     extract_parser = subparsers.add_parser("extract", help="Extract claims")
     extract_parser.add_argument("--config", required=True, help="Path to config YAML")
+    demo_parser = subparsers.add_parser("demo", help="Run demo generation and summary")
+    demo_parser.add_argument("--config", required=True, help="Path to config YAML")
     subparsers.add_parser("index", help="Indexing (not implemented)")
     subparsers.add_parser("analyze", help="Analysis (not implemented)")
     args = parser.parse_args()
     if args.command == "extract":
         extract_command(args.config)
+    elif args.command == "demo":
+        demo_command(args.config)
     elif args.command == "index":
         print("Indexing is not implemented yet.")
     elif args.command == "analyze":

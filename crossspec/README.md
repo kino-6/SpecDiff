@@ -12,12 +12,20 @@ CrossSpec is a CLI-first, API-friendly toolkit for extracting immutable claims f
 ## Quickstart
 
 ```bash
-python -m venv .venv
+uv venv
 source .venv/bin/activate
-pip install -e .
+uv pip install -e .
 
 crossspec extract --config crossspec.yml
 ```
+
+## Demo (effect verification)
+
+```bash
+crossspec demo --config samples/crossspec.yml
+```
+
+This generates small sample artifacts, runs extraction, and prints a human-friendly summary.
 
 ## Example configuration
 

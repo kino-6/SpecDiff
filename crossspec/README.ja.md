@@ -13,12 +13,20 @@ CrossSpec は、一般的な業務ドキュメントから「クレーム（Clai
 ## クイックスタート
 
 ```bash
-python -m venv .venv
+uv venv
 source .venv/bin/activate
-pip install -e .
+uv pip install -e .
 
 crossspec extract --config crossspec.yml
 ```
+
+## デモ（効果確認）
+
+```bash
+crossspec demo --config samples/crossspec.yml
+```
+
+サンプルデータを生成し、抽出結果のサマリを出力します。
 
 ## サンプル設定
 
