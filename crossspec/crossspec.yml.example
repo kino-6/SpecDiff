@@ -1,0 +1,54 @@
+version: 1
+project:
+  name: "Example Project"
+  repo_root: "."
+outputs:
+  claims_dir: "outputs"
+  jsonl_filename: "claims.jsonl"
+knowledge_sources:
+  - name: "Spec PDFs"
+    type: pdf
+    authority: normative
+    paths:
+      - "docs/**/*.pdf"
+  - name: "Requirements Spreadsheet"
+    type: xlsx
+    authority: approved_interpretation
+    paths:
+      - "data/requirements.xlsx"
+    xlsx:
+      tables:
+        - sheet: "Sheet1"
+          text_columns: ["Question", "Answer", "Status", "Owner"]
+          authority_by:
+            Status:
+              Draft: informative
+              Approved: normative
+  - name: "Slide Decks"
+    type: pptx
+    authority: informative
+    paths:
+      - "slides/**/*.pptx"
+    pptx:
+      unit: slide
+      include_notes: true
+  - name: "Email Threads"
+    type: eml
+    authority: unverified
+    paths:
+      - "mail/**/*.eml"
+    mail:
+      include_headers: ["From", "To", "Date", "Subject", "Message-ID"]
+
+# Optional tagging
+# tagging:
+#   enabled: true
+#   provider: "llm"
+#   taxonomy_path: "taxonomy/features.yaml"
+#   llm:
+#     model: "gpt-4o-mini"
+#     base_url: "https://api.openai.com/v1"
+#     api_key: "YOUR_API_KEY"
+#     temperature: 0.0
+#   output:
+#     facets_key: "facets"
