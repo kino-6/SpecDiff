@@ -47,6 +47,8 @@ def _parse_minimal_yaml(content: str) -> Dict[str, Any]:
                 container.append(new_map)
                 if value == "":
                     stack.append((indent + 2, new_map[key]))
+                elif _should_nest(lines, idx, indent):
+                    stack.append((indent + 2, new_map))
             else:
                 container.append(_parse_value(item))
         else:
@@ -123,6 +125,14 @@ def _peek_next_nonempty(lines: List[str], idx: int) -> str | None:
         if next_line.strip():
             return next_line
     return None
+
+
+def _should_nest(lines: List[str], idx: int, indent: int) -> bool:
+    next_line = _peek_next_nonempty(lines, idx)
+    if next_line is None:
+        return False
+    next_indent = len(next_line) - len(next_line.lstrip(" "))
+    return next_indent > indent
 
 
 def _is_int(value: str) -> bool:

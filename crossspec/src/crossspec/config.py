@@ -88,4 +88,40 @@ class CrossspecConfig(BaseModel):
 
 def load_config(path: str) -> CrossspecConfig:
     payload = load_yaml(path)
-    return CrossspecConfig(**payload)
+    return CrossspecConfig(**_coerce_payload(payload))
+
+
+def _coerce_payload(payload: dict) -> dict:
+    project = payload.get("project")
+    if isinstance(project, dict):
+        payload["project"] = ProjectConfig(**project)
+    outputs = payload.get("outputs")
+    if isinstance(outputs, dict):
+        payload["outputs"] = OutputConfig(**outputs)
+    sources = []
+    for source in payload.get("knowledge_sources", []):
+        if not isinstance(source, dict):
+            sources.append(source)
+            continue
+        xlsx = source.get("xlsx")
+        if isinstance(xlsx, dict) and "tables" in xlsx:
+            tables = [XlsxTableConfig(**table) for table in xlsx.get("tables", [])]
+            source["xlsx"] = XlsxConfig(tables=tables)
+        pptx = source.get("pptx")
+        if isinstance(pptx, dict):
+            source["pptx"] = PptxConfig(**pptx)
+        mail = source.get("mail")
+        if isinstance(mail, dict):
+            source["mail"] = MailConfig(**mail)
+        sources.append(KnowledgeSource(**source))
+    payload["knowledge_sources"] = sources
+    tagging = payload.get("tagging")
+    if isinstance(tagging, dict):
+        llm = tagging.get("llm")
+        if isinstance(llm, dict):
+            tagging["llm"] = TaggingLlm(**llm)
+        output = tagging.get("output")
+        if isinstance(output, dict):
+            tagging["output"] = TaggingOutput(**output)
+        payload["tagging"] = TaggingConfig(**tagging)
+    return payload
