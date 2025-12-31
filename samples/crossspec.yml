@@ -1,0 +1,41 @@
+version: 1
+project:
+  name: "CrossSpec Demo"
+  repo_root: "."
+outputs:
+  claims_dir: "samples/output"
+  jsonl_filename: "claims.jsonl"
+knowledge_sources:
+  - name: "Demo PDF"
+    type: pdf
+    authority: normative
+    paths:
+      - "samples/input/**/*.pdf"
+  - name: "Demo XLSX"
+    type: xlsx
+    authority: approved_interpretation
+    paths:
+      - "samples/input/**/*.xlsx"
+    xlsx:
+      tables:
+        - sheet: "Q&A"
+          text_columns: ["Question", "Answer", "Status", "Owner"]
+          authority_by:
+            Status:
+              Draft: informative
+              Approved: approved_interpretation
+  - name: "Demo PPTX"
+    type: pptx
+    authority: informative
+    paths:
+      - "samples/input/**/*.pptx"
+    pptx:
+      unit: slide
+      include_notes: true
+  - name: "Demo EML"
+    type: eml
+    authority: approved_interpretation
+    paths:
+      - "samples/input/mail/**/*.eml"
+    mail:
+      include_headers: ["From", "To", "Date", "Subject", "Message-ID"]
