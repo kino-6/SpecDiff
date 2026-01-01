@@ -40,15 +40,14 @@ knowledge_sources:
     mail:
       include_headers: ["From", "To", "Date", "Subject", "Message-ID"]
 
-# Optional tagging example (Ollama)
-# tagging:
-#   enabled: true
-#   provider: "llm"
-#   taxonomy_path: "taxonomy/features.yaml"
-#   llm:
-#     model: "gpt-oss:20b"
-#     base_url: "http://localhost:11434/v1"
-#     api_key: "ollama"
-#     temperature: 0.0
-#   output:
-#     facets_key: "facets"
+tagging:
+  enabled: true
+  provider: "llm"
+  taxonomy_path: "taxonomy/features.yaml"
+  llm:
+    model: "gpt-oss:20b"
+    base_url: "http://localhost:11434/v1"
+    api_key: "ollama"
+    temperature: 0.0
+  output:
+    facets_key: "facets"
