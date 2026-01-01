@@ -15,9 +15,9 @@ CrossSpec は、一般的な業務ドキュメントから「クレーム（Clai
 ```bash
 uv venv
 source .venv/bin/activate
-uv pip install -e .
+uv pip install -e ./crossspec
 
-cp crossspec.yml.example crossspec.yml
+cp crossspec/crossspec.yml.example crossspec.yml
 crossspec extract --config crossspec.yml
 ```
 
