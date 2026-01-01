@@ -23,7 +23,7 @@ crossspec extract --config crossspec.yml
 ## Demo (effect verification)
 
 ```bash
-uv pip install -e ./crossspec[demo]
+uv pip install -e './crossspec[demo]'
 
 crossspec demo --config samples/crossspec.yml
 ```

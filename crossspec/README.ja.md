@@ -24,7 +24,7 @@ crossspec extract --config crossspec.yml
 ## デモ（効果確認）
 
 ```bash
-uv pip install -e ./crossspec[demo]
+uv pip install -e './crossspec[demo]'
 
 crossspec demo --config samples/crossspec.yml
 ```
