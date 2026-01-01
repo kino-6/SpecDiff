@@ -31,6 +31,32 @@ crossspec demo --config samples/crossspec.yml
 
 PDF を含むサンプルデータを生成し、抽出結果のサマリを出力します。
 
+## Ollama によるタグ付け（任意）
+
+Ollama の OpenAI 互換 API を使ってローカルでタグ付けできます。
+
+```bash
+ollama pull gpt-oss:20b
+```
+
+`crossspec.yml` の例:
+
+```yaml
+tagging:
+  enabled: true
+  provider: "llm"
+  taxonomy_path: "taxonomy/features.yaml"
+  llm:
+    model: "gpt-oss:20b"
+    base_url: "http://localhost:11434/v1"
+    api_key: "ollama"
+    temperature: 0.0
+  output:
+    facets_key: "facets"
+```
+
+タグ付けは任意で、`tagging.enabled` を `false` にすると無効化できます。
+
 ## サンプル設定
 
 `crossspec.yml.example` を参照してください。

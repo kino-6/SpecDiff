@@ -25,36 +25,40 @@ class LlmTagger:
         self.llm = llm
 
     def tag(self, text: str) -> Dict[str, Any]:
-        try:
-            response = requests.post(
-                f"{self.llm.base_url.rstrip('/')}/chat/completions",
-                headers={"Authorization": f"Bearer {self.llm.api_key}"},
-                json={
-                    "model": self.llm.model,
-                    "temperature": self.llm.temperature,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": (
-                                "You are a classifier. Reply with strict JSON only, no extra text."
-                            ),
-                        },
-                        {
-                            "role": "user",
-                            "content": self._prompt(text),
-                        },
-                    ],
-                },
-                timeout=30,
-            )
-            response.raise_for_status()
-            payload = response.json()
-            content = payload["choices"][0]["message"]["content"]
-            facets = json.loads(content)
-            if self._validate_facets(facets):
-                return facets
-        except Exception:
-            return DEFAULT_FALLBACK.copy()
+        for attempt in range(2):
+            try:
+                response = requests.post(
+                    f"{self.llm.base_url.rstrip('/')}/chat/completions",
+                    headers={"Authorization": f"Bearer {self.llm.api_key}"},
+                    json={
+                        "model": self.llm.model,
+                        "temperature": self.llm.temperature,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": (
+                                    "You are a classifier. Reply with strict JSON only, no extra text."
+                                ),
+                            },
+                            {
+                                "role": "user",
+                                "content": self._prompt(text),
+                            },
+                        ],
+                    },
+                    timeout=30,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                content = payload["choices"][0]["message"]["content"]
+                facets = json.loads(content)
+                if self._validate_facets(facets):
+                    return facets
+            except (json.JSONDecodeError, KeyError, TypeError):
+                if attempt == 0:
+                    continue
+            except Exception:
+                return DEFAULT_FALLBACK.copy()
         return DEFAULT_FALLBACK.copy()
 
     def _prompt(self, text: str) -> str:

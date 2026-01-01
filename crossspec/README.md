@@ -30,6 +30,32 @@ crossspec demo --config samples/crossspec.yml
 
 This generates small sample artifacts (including PDF), runs extraction, and prints a human-friendly summary.
 
+## Tagging with Ollama (optional)
+
+CrossSpec can use a local Ollama server via the OpenAI-compatible API.
+
+```bash
+ollama pull gpt-oss:20b
+```
+
+Update your `crossspec.yml`:
+
+```yaml
+tagging:
+  enabled: true
+  provider: "llm"
+  taxonomy_path: "taxonomy/features.yaml"
+  llm:
+    model: "gpt-oss:20b"
+    base_url: "http://localhost:11434/v1"
+    api_key: "ollama"
+    temperature: 0.0
+  output:
+    facets_key: "facets"
+```
+
+Tagging is optional and can be disabled by setting `tagging.enabled` to `false`.
+
 ## Example configuration
 
 See [`crossspec.yml.example`](crossspec.yml.example) for a complete template.
