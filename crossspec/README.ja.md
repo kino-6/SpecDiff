@@ -24,10 +24,12 @@ crossspec extract --config crossspec.yml
 ## デモ（効果確認）
 
 ```bash
+uv pip install -e ./crossspec[demo]
+
 crossspec demo --config samples/crossspec.yml
 ```
 
-サンプルデータを生成し、抽出結果のサマリを出力します。
+PDF を含むサンプルデータを生成し、抽出結果のサマリを出力します。
 
 ## サンプル設定
 

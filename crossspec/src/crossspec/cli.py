@@ -148,6 +148,12 @@ def _run_demo(cfg: CrossspecConfig) -> None:
         print("samples/generate_samples.py not found; skipping sample generation.")
 
     output_path = Path(cfg.outputs.claims_dir) / cfg.outputs.jsonl_filename
+    pdf_expected = Path("samples/input/sample.pdf")
+    if not pdf_expected.exists():
+        raise RuntimeError(
+            "Demo requires PDF sample generation. Install extras with "
+            "`pip install -e \"./crossspec[demo]\"` (or `uv pip install -e ./crossspec[demo]`)."
+        )
     claims = list(_extract_claims(cfg))
     write_jsonl(output_path, claims)
     print(f"Wrote {len(claims)} claims to {output_path}")
