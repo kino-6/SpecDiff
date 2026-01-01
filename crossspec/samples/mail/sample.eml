@@ -1,0 +1,8 @@
+From: alice@example.com
+To: bob@example.com
+Date: Fri, 01 Mar 2024 10:00:00 +0000
+Subject: Sample Claim
+Message-ID: <sample-1@example.com>
+Content-Type: text/plain; charset="utf-8"
+
+This is a sample claim line to demonstrate extraction.
