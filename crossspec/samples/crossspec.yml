@@ -1,0 +1,15 @@
+version: 1
+project:
+  name: "Sample Project"
+  repo_root: "."
+outputs:
+  claims_dir: "crossspec/samples/output"
+  jsonl_filename: "claims.jsonl"
+knowledge_sources:
+  - name: "Sample EML"
+    type: eml
+    authority: informative
+    paths:
+      - "crossspec/samples/mail/sample.eml"
+    mail:
+      include_headers: ["From", "To", "Date", "Subject", "Message-ID"]
