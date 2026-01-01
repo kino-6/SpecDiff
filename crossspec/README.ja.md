@@ -24,12 +24,18 @@ crossspec extract --config crossspec.yml
 ## デモ（効果確認）
 
 ```bash
-uv pip install -e './crossspec[demo]'
+uv pip install -e ./crossspec\[demo\]
 
 crossspec demo --config samples/crossspec.yml
 ```
 
 PDF を含むサンプルデータを生成し、抽出結果のサマリを出力します。
+
+## セットアップ用スクリプト（任意）
+
+```bash
+./scripts/setup_demo.sh
+```
 
 ## Ollama によるタグ付け（任意）
 

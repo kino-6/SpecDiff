@@ -23,12 +23,18 @@ crossspec extract --config crossspec.yml
 ## Demo (effect verification)
 
 ```bash
-uv pip install -e './crossspec[demo]'
+uv pip install -e ./crossspec\[demo\]
 
 crossspec demo --config samples/crossspec.yml
 ```
 
 This generates small sample artifacts (including PDF), runs extraction, and prints a human-friendly summary.
+
+## Optional setup script
+
+```bash
+./scripts/setup_demo.sh
+```
 
 ## Tagging with Ollama (optional)
 
