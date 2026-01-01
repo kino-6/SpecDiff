@@ -17,6 +17,7 @@ uv venv
 source .venv/bin/activate
 uv pip install -e .
 
+cp crossspec.yml.example crossspec.yml
 crossspec extract --config crossspec.yml
 ```
 
