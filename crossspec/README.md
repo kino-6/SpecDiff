@@ -18,6 +18,7 @@ uv pip install -e ./crossspec
 
 cp crossspec/crossspec.yml.example crossspec.yml
 crossspec extract --config crossspec.yml
+crossspec extract --config crossspec.yml --save
 ```
 
 ## Demo (effect verification)
@@ -87,6 +88,23 @@ CrossSpec can extract code assertions (internally stored as Claims) from C/C++ a
 crossspec code-extract --repo . --out outputs/code_claims.jsonl
 crossspec search --claims outputs/code_claims.jsonl --query "init" --type code
 ```
+
+Options (defaults shown):
+
+- `--repo`: repository root directory to scan (default `"."`).
+- `--config`: optional config YAML; used to infer repo root when `--repo` is `"."`.
+- `--out`: output JSONL path (required).
+- `--include`: include glob(s) (repeatable). Defaults: `**/*.c`, `**/*.cc`, `**/*.cpp`, `**/*.cxx`, `**/*.h`, `**/*.hpp`, `**/*.hh`, `**/*.py`.
+- `--exclude`: exclude glob(s) (repeatable). Defaults: `**/.git/**`, `**/.venv/**`, `**/venv/**`, `**/__pycache__/**`, `**/build/**`, `**/dist/**`, `**/node_modules/**`, `**/.mypy_cache/**`, `**/.pytest_cache/**`.
+- `--unit`: extraction unit `{function|class|file}` (default `"function"`).
+- `--max-bytes`: skip files larger than this (default `1_000_000`).
+- `--encoding`: primary encoding (default `"utf-8"`, fallback to `utf-8-sig` and `latin-1`).
+- `--language`: filter `{c|cpp|python|all}` (default `"all"`).
+- `--authority`: claim authority (default `"informative"`).
+- `--status`: claim status (default `"active"`).
+- `--dry-run`: print matched files without extracting.
+- `--save`: reuse existing output JSONL if it already exists.
+- `--top`: limit number of units extracted.
 
 Notes:
 - The UI uses the term “Assertion”, but the underlying records remain Claim objects.

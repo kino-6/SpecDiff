@@ -31,11 +31,19 @@ else:
     app = None
 
 
-def extract_command(config: str) -> None:
+def extract_command(config: str, save: bool = False) -> None:
     """Extract claims from configured knowledge sources."""
     cfg = load_config(config)
-    claims = list(_extract_claims(cfg))
     output_path = Path(cfg.outputs.claims_dir) / cfg.outputs.jsonl_filename
+    if save and output_path.exists():
+        count = _count_jsonl_lines(output_path)
+        message = f"Using existing claims at {output_path} ({count} claims)"
+        if typer:
+            typer.echo(message)
+        else:
+            print(message)
+        return
+    claims = list(_extract_claims(cfg))
     write_jsonl(output_path, claims)
     message = f"Wrote {len(claims)} claims to {output_path}"
     if typer:
@@ -47,8 +55,11 @@ def extract_command(config: str) -> None:
 if typer:
 
     @app.command()
-    def extract(config: str = typer.Option(..., "--config", help="Path to config YAML")) -> None:
-        extract_command(config)
+    def extract(
+        config: str = typer.Option(..., "--config", help="Path to config YAML"),
+        save: bool = typer.Option(False, "--save", help="Reuse existing output if present"),
+    ) -> None:
+        extract_command(config, save=save)
 
     @app.command()
     def demo(config: str = typer.Option(..., "--config", help="Path to config YAML")) -> None:
@@ -56,7 +67,7 @@ if typer:
 
     @app.command()
     def search(
-        config: str = typer.Option(..., "--config", help="Path to config YAML"),
+        config: Optional[str] = typer.Option(None, "--config", help="Path to config YAML"),
         query: Optional[str] = typer.Option(None, "--query", help="Search query"),
         feature: Optional[str] = typer.Option(None, "--feature", help="Facet feature filter"),
         authority: Optional[str] = typer.Option(None, "--authority", help="Authority filter"),
@@ -92,6 +103,7 @@ if typer:
         authority: str = typer.Option("informative", "--authority", help="Authority value"),
         status: str = typer.Option("active", "--status", help="Status value"),
         dry_run: bool = typer.Option(False, "--dry-run", help="Print matched files"),
+        save: bool = typer.Option(False, "--save", help="Reuse existing output if present"),
         top: Optional[int] = typer.Option(None, "--top", help="Limit number of units extracted"),
     ) -> None:
         code_extract_command(
@@ -107,6 +119,7 @@ if typer:
             authority=authority,
             status=status,
             dry_run=dry_run,
+            save=save,
             top=top,
         )
 
@@ -215,6 +228,7 @@ def code_extract_command(
     authority: str,
     status: str,
     dry_run: bool,
+    save: bool,
     top: Optional[int],
 ) -> None:
     repo_root = Path(repo)
@@ -223,6 +237,16 @@ def code_extract_command(
         repo_root = Path(cfg.project.repo_root)
     includes = include or default_includes(language)
     excludes = exclude or list(DEFAULT_EXCLUDES)
+    output_path = Path(out)
+    if save and output_path.exists() and not dry_run:
+        count = _count_jsonl_lines(output_path)
+        message = f"Using existing claims at {output_path} ({count} claims)"
+        if typer:
+            typer.echo(message)
+        else:
+            print(message)
+        return
+
     scanned = scan_files(
         repo_root=repo_root,
         includes=includes,
@@ -290,7 +314,6 @@ def code_extract_command(
         if top is not None and extracted_count >= top:
             break
 
-    output_path = Path(out)
     write_jsonl(output_path, claims)
     message = f"Wrote {len(claims)} code claims to {output_path}"
     if typer:
@@ -305,6 +328,14 @@ def _category_from_language(language: str) -> str:
     if language == "c":
         return "C"
     return "CPP"
+
+
+def _count_jsonl_lines(path: Path) -> int:
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            return sum(1 for line in handle if line.strip())
+    except OSError:
+        return 0
 
 
 def _run_demo(cfg: CrossspecConfig) -> None:
@@ -412,7 +443,7 @@ def _select_representative_samples(claims: List[Claim]) -> dict:
 
 def search_command(
     *,
-    config: str,
+    config: Optional[str],
     query: Optional[str],
     feature: Optional[str],
     authority: Optional[str],
@@ -422,10 +453,12 @@ def search_command(
     show_provenance: bool,
     show_source: bool,
 ) -> None:
-    cfg = load_config(config)
     if claims_path:
         input_path = Path(claims_path)
     else:
+        if not config:
+            raise ValueError("--config is required when --claims is not provided")
+        cfg = load_config(config)
         input_path = Path(cfg.outputs.claims_dir) / cfg.outputs.jsonl_filename
     results = _search_claims(
         input_path=input_path,
@@ -521,10 +554,11 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command")
     extract_parser = subparsers.add_parser("extract", help="Extract claims")
     extract_parser.add_argument("--config", required=True, help="Path to config YAML")
+    extract_parser.add_argument("--save", action="store_true", help="Reuse existing output if present")
     demo_parser = subparsers.add_parser("demo", help="Run demo generation and summary")
     demo_parser.add_argument("--config", required=True, help="Path to config YAML")
     search_parser = subparsers.add_parser("search", help="Search claims")
-    search_parser.add_argument("--config", required=True, help="Path to config YAML")
+    search_parser.add_argument("--config", required=False, help="Path to config YAML")
     search_parser.add_argument("--query", required=False, help="Search query")
     search_parser.add_argument("--feature", required=False, help="Facet feature filter")
     search_parser.add_argument("--authority", required=False, help="Authority filter")
@@ -546,12 +580,13 @@ def main() -> None:
     code_extract_parser.add_argument("--authority", default="informative", help="Authority value")
     code_extract_parser.add_argument("--status", default="active", help="Status value")
     code_extract_parser.add_argument("--dry-run", action="store_true", help="Print matched files")
+    code_extract_parser.add_argument("--save", action="store_true", help="Reuse existing output if present")
     code_extract_parser.add_argument("--top", type=int, default=None, help="Limit number of units extracted")
     subparsers.add_parser("index", help="Indexing (not implemented)")
     subparsers.add_parser("analyze", help="Analysis (not implemented)")
     args = parser.parse_args()
     if args.command == "extract":
-        extract_command(args.config)
+        extract_command(args.config, save=args.save)
     elif args.command == "demo":
         demo_command(args.config)
     elif args.command == "search":
@@ -580,6 +615,7 @@ def main() -> None:
             authority=args.authority,
             status=args.status,
             dry_run=args.dry_run,
+            save=args.save,
             top=args.top,
         )
     elif args.command == "index":
