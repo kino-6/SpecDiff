@@ -12,8 +12,16 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - fallback for minimal envs
     typer = None
 
-from crossspec.claims import Authority, Claim, ClaimIdGenerator, SourceInfo, category_from_facets, build_claim
+from crossspec.claims import Authority, Claim, ClaimIdGenerator, SourceInfo, Status, category_from_facets, build_claim
 from crossspec.config import CrossspecConfig, KnowledgeSource, MailConfig, PptxConfig, load_config
+from crossspec.code_extract import (
+    DEFAULT_EXCLUDES,
+    default_includes,
+    extract_c_cpp_units,
+    extract_python_units,
+    read_text_with_fallback,
+    scan_files,
+)
 from crossspec.io.jsonl import write_jsonl
 from crossspec.tagging import load_taxonomy
 
@@ -70,6 +78,38 @@ if typer:
             show_source=show_source,
         )
 
+    @app.command(name="code-extract")
+    def code_extract(
+        repo: str = typer.Option(".", "--repo", help="Repository root to scan"),
+        config: Optional[str] = typer.Option(None, "--config", help="Optional config YAML"),
+        out: str = typer.Option(..., "--out", help="Output JSONL path"),
+        include: Optional[List[str]] = typer.Option(None, "--include", help="Include glob (repeatable)"),
+        exclude: Optional[List[str]] = typer.Option(None, "--exclude", help="Exclude glob (repeatable)"),
+        unit: str = typer.Option("function", "--unit", help="Extraction unit (function|class|file)"),
+        max_bytes: int = typer.Option(1_000_000, "--max-bytes", help="Skip files larger than this"),
+        encoding: str = typer.Option("utf-8", "--encoding", help="Primary encoding"),
+        language: str = typer.Option("all", "--language", help="Language filter (c|cpp|python|all)"),
+        authority: str = typer.Option("informative", "--authority", help="Authority value"),
+        status: str = typer.Option("active", "--status", help="Status value"),
+        dry_run: bool = typer.Option(False, "--dry-run", help="Print matched files"),
+        top: Optional[int] = typer.Option(None, "--top", help="Limit number of units extracted"),
+    ) -> None:
+        code_extract_command(
+            repo=repo,
+            config=config,
+            out=out,
+            include=include,
+            exclude=exclude,
+            unit=unit,
+            max_bytes=max_bytes,
+            encoding=encoding,
+            language=language,
+            authority=authority,
+            status=status,
+            dry_run=dry_run,
+            top=top,
+        )
+
     @app.command()
     def index() -> None:
         """Placeholder for future indexing."""
@@ -102,7 +142,7 @@ def _extract_claims(cfg: CrossspecConfig) -> Iterable[Claim]:
                 facets = None
                 if tagger:
                     facets = tagger.tag(extracted.text_raw)
-                category = category_from_facets(facets)
+                category = category_from_facets(facets, category_hint=None)
                 claim_id = id_generator.next_id(category)
                 facets_payload = None
                 if facets is not None:
@@ -159,6 +199,112 @@ def _build_extractor(source: KnowledgeSource, path: Path):
 def demo_command(config: str) -> None:
     cfg = load_config(config)
     _run_demo(cfg)
+
+
+def code_extract_command(
+    *,
+    repo: str,
+    config: Optional[str],
+    out: str,
+    include: Optional[List[str]],
+    exclude: Optional[List[str]],
+    unit: str,
+    max_bytes: int,
+    encoding: str,
+    language: str,
+    authority: str,
+    status: str,
+    dry_run: bool,
+    top: Optional[int],
+) -> None:
+    repo_root = Path(repo)
+    if config and repo == ".":
+        cfg = load_config(config)
+        repo_root = Path(cfg.project.repo_root)
+    includes = include or default_includes(language)
+    excludes = exclude or list(DEFAULT_EXCLUDES)
+    scanned = scan_files(
+        repo_root=repo_root,
+        includes=includes,
+        excludes=excludes,
+        max_bytes=max_bytes,
+        language_filter=language,
+    )
+    if dry_run:
+        for entry in scanned:
+            print(entry.path)
+        return
+
+    id_generator = ClaimIdGenerator()
+    claims: List[Claim] = []
+    authority_value = Authority(authority)
+    status_value = Status(status)
+    extracted_count = 0
+    for entry in scanned:
+        try:
+            text, sha1 = read_text_with_fallback(entry.path, encoding)
+        except OSError as exc:
+            print(f"Skipping {entry.path}: {exc}")
+            continue
+        try:
+            rel_path = entry.path.relative_to(repo_root).as_posix()
+        except ValueError:
+            rel_path = entry.path.as_posix()
+        if entry.language == "python":
+            extracted_units = extract_python_units(
+                path=entry.path,
+                source_path=rel_path,
+                text=text,
+                unit=unit,
+                authority=authority_value,
+                sha1=sha1,
+            )
+        else:
+            extracted_units = extract_c_cpp_units(
+                path=entry.path,
+                source_path=rel_path,
+                text=text,
+                unit=unit,
+                authority=authority_value,
+                sha1=sha1,
+                language=entry.language,
+                is_header=entry.is_header,
+            )
+        for extracted in extracted_units:
+            category_hint = _category_from_language(entry.language)
+            category = category_from_facets(None, category_hint=category_hint)
+            claim_id = id_generator.next_id(category)
+            claim = build_claim(
+                claim_id=claim_id,
+                authority=authority_value,
+                text_raw=extracted.text_raw,
+                source_type=extracted.source_type,
+                source_path=extracted.source_path,
+                provenance=extracted.provenance,
+                status=status_value,
+            )
+            claims.append(claim)
+            extracted_count += 1
+            if top is not None and extracted_count >= top:
+                break
+        if top is not None and extracted_count >= top:
+            break
+
+    output_path = Path(out)
+    write_jsonl(output_path, claims)
+    message = f"Wrote {len(claims)} code claims to {output_path}"
+    if typer:
+        typer.echo(message)
+    else:
+        print(message)
+
+
+def _category_from_language(language: str) -> str:
+    if language == "python":
+        return "PY"
+    if language == "c":
+        return "C"
+    return "CPP"
 
 
 def _run_demo(cfg: CrossspecConfig) -> None:
@@ -387,6 +533,20 @@ def main() -> None:
     search_parser.add_argument("--claims", required=False, help="Claims JSONL path")
     search_parser.add_argument("--show-provenance", action="store_true", help="Show provenance")
     search_parser.add_argument("--show-source", action="store_true", help="Show source details")
+    code_extract_parser = subparsers.add_parser("code-extract", help="Extract code claims")
+    code_extract_parser.add_argument("--repo", default=".", help="Repository root to scan")
+    code_extract_parser.add_argument("--config", required=False, help="Optional config YAML")
+    code_extract_parser.add_argument("--out", required=True, help="Output JSONL path")
+    code_extract_parser.add_argument("--include", action="append", help="Include glob (repeatable)")
+    code_extract_parser.add_argument("--exclude", action="append", help="Exclude glob (repeatable)")
+    code_extract_parser.add_argument("--unit", default="function", help="Extraction unit (function|class|file)")
+    code_extract_parser.add_argument("--max-bytes", type=int, default=1_000_000, help="Skip files larger than this")
+    code_extract_parser.add_argument("--encoding", default="utf-8", help="Primary encoding")
+    code_extract_parser.add_argument("--language", default="all", help="Language filter (c|cpp|python|all)")
+    code_extract_parser.add_argument("--authority", default="informative", help="Authority value")
+    code_extract_parser.add_argument("--status", default="active", help="Status value")
+    code_extract_parser.add_argument("--dry-run", action="store_true", help="Print matched files")
+    code_extract_parser.add_argument("--top", type=int, default=None, help="Limit number of units extracted")
     subparsers.add_parser("index", help="Indexing (not implemented)")
     subparsers.add_parser("analyze", help="Analysis (not implemented)")
     args = parser.parse_args()
@@ -405,6 +565,22 @@ def main() -> None:
             claims_path=args.claims,
             show_provenance=args.show_provenance,
             show_source=args.show_source,
+        )
+    elif args.command == "code-extract":
+        code_extract_command(
+            repo=args.repo,
+            config=args.config,
+            out=args.out,
+            include=args.include,
+            exclude=args.exclude,
+            unit=args.unit,
+            max_bytes=args.max_bytes,
+            encoding=args.encoding,
+            language=args.language,
+            authority=args.authority,
+            status=args.status,
+            dry_run=args.dry_run,
+            top=args.top,
         )
     elif args.command == "index":
         print("Indexing is not implemented yet.")
