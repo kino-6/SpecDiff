@@ -30,6 +30,15 @@ crossspec demo --config samples/crossspec.yml
 
 This generates small sample artifacts (including PDF), runs extraction, and prints a human-friendly summary.
 
+Note: Counts by `facets.feature` are multi-label; totals can exceed total claims.
+
+## Search
+
+```bash
+crossspec search --config samples/crossspec.yml --feature brake --top 5
+crossspec search --config samples/crossspec.yml --query "timing" --type pdf
+```
+
 ## Optional setup script
 
 ```bash

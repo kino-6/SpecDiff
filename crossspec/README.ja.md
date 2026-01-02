@@ -31,6 +31,15 @@ crossspec demo --config samples/crossspec.yml
 
 PDF を含むサンプルデータを生成し、抽出結果のサマリを出力します。
 
+※ `facets.feature` は複数ラベルのため、合計件数は全クレーム数を超える場合があります。
+
+## 検索
+
+```bash
+crossspec search --config samples/crossspec.yml --feature brake --top 5
+crossspec search --config samples/crossspec.yml --query "timing" --type pdf
+```
+
 ## セットアップ用スクリプト（任意）
 
 ```bash

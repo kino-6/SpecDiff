@@ -47,6 +47,30 @@ if typer:
         demo_command(config)
 
     @app.command()
+    def search(
+        config: str = typer.Option(..., "--config", help="Path to config YAML"),
+        query: Optional[str] = typer.Option(None, "--query", help="Search query"),
+        feature: Optional[str] = typer.Option(None, "--feature", help="Facet feature filter"),
+        authority: Optional[str] = typer.Option(None, "--authority", help="Authority filter"),
+        type: Optional[str] = typer.Option(None, "--type", help="Source type filter"),
+        top: int = typer.Option(10, "--top", help="Max results"),
+        claims: Optional[str] = typer.Option(None, "--claims", help="Claims JSONL path"),
+        show_provenance: bool = typer.Option(False, "--show-provenance", help="Show provenance"),
+        show_source: bool = typer.Option(False, "--show-source", help="Show source details"),
+    ) -> None:
+        search_command(
+            config=config,
+            query=query,
+            feature=feature,
+            authority=authority,
+            source_type=type,
+            top=top,
+            claims_path=claims,
+            show_provenance=show_provenance,
+            show_source=show_source,
+        )
+
+    @app.command()
     def index() -> None:
         """Placeholder for future indexing."""
         typer.echo("Indexing is not implemented yet.")
@@ -188,15 +212,154 @@ def _run_demo(cfg: CrossspecConfig) -> None:
             print(f"  {key}: {value}")
     else:
         print("Counts by facets.feature: no facets")
+    print("Note: Counts by facets.feature is multi-label; totals can exceed total claims.")
 
     print("Sample claims:")
     if not claims:
         print("  (no claims found)")
         return
-    for claim in claims[:3]:
-        text_preview = claim.text_raw.replace("\n", " ")[:120]
-        print(f"  {claim.claim_id} | {claim.source.path} | {claim.provenance}")
-        print(f"    {text_preview}")
+    samples_by_type = _select_representative_samples(claims)
+    for source_type in sorted(samples_by_type):
+        claim = samples_by_type[source_type]
+        text_preview = claim.text_raw.replace("\n", " ")[:160]
+        print(f"TYPE: {source_type} | {claim.claim_id} | {claim.source.path} | {claim.provenance}")
+        print(f"  {text_preview}")
+
+
+def _authority_rank(value: str) -> int:
+    order = {
+        "normative": 4,
+        "approved_interpretation": 3,
+        "informative": 2,
+        "unverified": 1,
+    }
+    return order.get(value, 0)
+
+
+def _features_from_facets(facets: Optional[dict]) -> List[str]:
+    if not facets or not isinstance(facets, dict):
+        return []
+    if "feature" in facets and isinstance(facets.get("feature"), list):
+        return facets.get("feature") or []
+    for value in facets.values():
+        if isinstance(value, dict) and isinstance(value.get("feature"), list):
+            return value.get("feature") or []
+    return []
+
+
+def _select_representative_samples(claims: List[Claim]) -> dict:
+    grouped = {}
+    for claim in claims:
+        source_type = claim.source.type
+        grouped.setdefault(source_type, []).append(claim)
+    samples = {}
+    for source_type, items in grouped.items():
+        def sort_key(item: Claim) -> tuple:
+            authority_value = getattr(item.authority, "value", str(item.authority))
+            rank = _authority_rank(authority_value)
+            has_feature = bool(_features_from_facets(item.facets))
+            return (-rank, -int(has_feature), item.claim_id)
+
+        samples[source_type] = sorted(items, key=sort_key)[0]
+    return samples
+
+
+def search_command(
+    *,
+    config: str,
+    query: Optional[str],
+    feature: Optional[str],
+    authority: Optional[str],
+    source_type: Optional[str],
+    top: int,
+    claims_path: Optional[str],
+    show_provenance: bool,
+    show_source: bool,
+) -> None:
+    cfg = load_config(config)
+    if claims_path:
+        input_path = Path(claims_path)
+    else:
+        input_path = Path(cfg.outputs.claims_dir) / cfg.outputs.jsonl_filename
+    results = _search_claims(
+        input_path=input_path,
+        query=query,
+        feature=feature,
+        authority=authority,
+        source_type=source_type,
+    )
+    if not results:
+        print("No results.")
+        return
+    for claim in results[:top]:
+        authority_value = getattr(claim.authority, "value", str(claim.authority))
+        print(f"{claim.claim_id} | {authority_value} | {claim.source.type} | {claim.source.path}")
+        if show_source:
+            print(f"  source: {claim.source.model_dump()}")
+        if show_provenance:
+            print(f"  provenance: {claim.provenance}")
+        excerpt = " ".join(claim.text_raw.split())[:200]
+        print(f"  {excerpt}")
+
+
+def _search_claims(
+    *,
+    input_path: Path,
+    query: Optional[str],
+    feature: Optional[str],
+    authority: Optional[str],
+    source_type: Optional[str],
+) -> List[Claim]:
+    import json
+
+    claims: List[Claim] = []
+    with input_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            claims.append(Claim(**json.loads(line)))
+    filtered = []
+    for claim in claims:
+        if source_type and claim.source.type != source_type:
+            continue
+        if authority:
+            authority_value = getattr(claim.authority, "value", str(claim.authority))
+            if authority_value != authority:
+                continue
+        if feature:
+            features = _features_from_facets(claim.facets)
+            if feature not in features:
+                continue
+        if query:
+            haystack = claim.text_raw
+            if claim.text_norm:
+                haystack = f"{haystack}\n{claim.text_norm}"
+            if query.lower() not in haystack.lower():
+                continue
+        filtered.append(claim)
+    return _rank_claims(filtered, query)
+
+
+def _rank_claims(claims: List[Claim], query: Optional[str]) -> List[Claim]:
+    query_lower = query.lower() if query else None
+
+    def match_key(claim: Claim) -> tuple:
+        authority_value = getattr(claim.authority, "value", str(claim.authority))
+        rank = _authority_rank(authority_value)
+        if query_lower:
+            raw_lower = claim.text_raw.lower()
+            exact = query_lower in raw_lower
+            distance = max(len(claim.text_raw) - len(query_lower), 0)
+            return (
+                -int(exact),
+                distance,
+                -rank,
+                claim.claim_id,
+            )
+        return (-rank, claim.claim_id)
+
+    return sorted(claims, key=match_key)
 
 
 def main() -> None:
@@ -211,6 +374,16 @@ def main() -> None:
     extract_parser.add_argument("--config", required=True, help="Path to config YAML")
     demo_parser = subparsers.add_parser("demo", help="Run demo generation and summary")
     demo_parser.add_argument("--config", required=True, help="Path to config YAML")
+    search_parser = subparsers.add_parser("search", help="Search claims")
+    search_parser.add_argument("--config", required=True, help="Path to config YAML")
+    search_parser.add_argument("--query", required=False, help="Search query")
+    search_parser.add_argument("--feature", required=False, help="Facet feature filter")
+    search_parser.add_argument("--authority", required=False, help="Authority filter")
+    search_parser.add_argument("--type", required=False, help="Source type filter")
+    search_parser.add_argument("--top", type=int, default=10, help="Max results")
+    search_parser.add_argument("--claims", required=False, help="Claims JSONL path")
+    search_parser.add_argument("--show-provenance", action="store_true", help="Show provenance")
+    search_parser.add_argument("--show-source", action="store_true", help="Show source details")
     subparsers.add_parser("index", help="Indexing (not implemented)")
     subparsers.add_parser("analyze", help="Analysis (not implemented)")
     args = parser.parse_args()
@@ -218,6 +391,18 @@ def main() -> None:
         extract_command(args.config)
     elif args.command == "demo":
         demo_command(args.config)
+    elif args.command == "search":
+        search_command(
+            config=args.config,
+            query=args.query,
+            feature=args.feature,
+            authority=args.authority,
+            source_type=args.type,
+            top=args.top,
+            claims_path=args.claims,
+            show_provenance=args.show_provenance,
+            show_source=args.show_source,
+        )
     elif args.command == "index":
         print("Indexing is not implemented yet.")
     elif args.command == "analyze":
