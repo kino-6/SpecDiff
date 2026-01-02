@@ -1,9 +1,11 @@
+import json
 from pathlib import Path
 
 from crossspec.claims import Authority, ClaimIdGenerator, build_claim
+from crossspec.cli import code_extract_command
 from crossspec.code_extract.c_cpp_extractor import extract_c_cpp_units
 from crossspec.code_extract.python_extractor import extract_python_units
-from crossspec.code_extract.scanner import read_text_with_fallback
+from crossspec.code_extract.scanner import DEFAULT_EXCLUDES, read_text_with_fallback, scan_files
 
 
 def _build_claims(extracted):
@@ -147,3 +149,94 @@ def test_header_defaults_to_file(tmp_path: Path) -> None:
     assert item.provenance["line_start"] == 1
     assert item.provenance["line_end"] == 1
     assert "MAX_VALUE" in item.text_raw
+
+
+def test_code_extract_is_deterministic(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "alpha.py").write_text(
+        """
+def alpha():
+    return "alpha"
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (repo_root / "src" / "beta.cpp").write_text(
+        """
+int beta() {
+    return 42;
+}
+""".lstrip(),
+        encoding="utf-8",
+    )
+    output_path = repo_root / "outputs" / "claims.jsonl"
+
+    code_extract_command(
+        repo=str(repo_root),
+        config=None,
+        out=str(output_path),
+        include=None,
+        exclude=None,
+        unit="function",
+        max_bytes=1_000_000,
+        encoding="utf-8",
+        language="all",
+        authority="informative",
+        status="active",
+        dry_run=False,
+        save=False,
+        top=None,
+    )
+    first_ids = _read_claim_ids(output_path)
+
+    code_extract_command(
+        repo=str(repo_root),
+        config=None,
+        out=str(output_path),
+        include=None,
+        exclude=None,
+        unit="function",
+        max_bytes=1_000_000,
+        encoding="utf-8",
+        language="all",
+        authority="informative",
+        status="active",
+        dry_run=False,
+        save=False,
+        top=None,
+    )
+    second_ids = _read_claim_ids(output_path)
+
+    assert first_ids
+    assert first_ids == second_ids
+    assert len(first_ids) == len(second_ids)
+
+
+def test_output_directories_excluded_by_default(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "outputs").mkdir()
+    (repo_root / "src").mkdir()
+    (repo_root / "outputs" / "generated.py").write_text("print('skip')\n", encoding="utf-8")
+    (repo_root / "src" / "keep.py").write_text("print('keep')\n", encoding="utf-8")
+
+    scanned = scan_files(
+        repo_root=repo_root,
+        includes=["**/*.py"],
+        excludes=DEFAULT_EXCLUDES,
+        max_bytes=1_000_000,
+        language_filter="python",
+    )
+    scanned_paths = {entry.relative_path for entry in scanned}
+
+    assert "src/keep.py" in scanned_paths
+    assert "outputs/generated.py" not in scanned_paths
+
+
+def _read_claim_ids(path: Path) -> list[str]:
+    return [
+        json.loads(line)["claim_id"]
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]

@@ -12,6 +12,7 @@ from crossspec.code_extract.scanner import (
     detect_language,
     read_text_with_fallback,
     scan_files,
+    scan_files_with_summary,
 )
 
 __all__ = [
@@ -24,6 +25,7 @@ __all__ = [
     "detect_language",
     "read_text_with_fallback",
     "scan_files",
+    "scan_files_with_summary",
     "extract_c_cpp_units",
     "extract_python_units",
 ]
