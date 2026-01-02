@@ -12,7 +12,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - fallback for minimal envs
     typer = None
 
-from crossspec.claims import Authority, Claim, ClaimIdGenerator, category_from_facets, build_claim
+from crossspec.claims import Authority, Claim, ClaimIdGenerator, SourceInfo, category_from_facets, build_claim
 from crossspec.config import CrossspecConfig, KnowledgeSource, MailConfig, PptxConfig, load_config
 from crossspec.io.jsonl import write_jsonl
 from crossspec.tagging import load_taxonomy
@@ -318,7 +318,10 @@ def _search_claims(
             line = line.strip()
             if not line:
                 continue
-            claims.append(Claim(**json.loads(line)))
+            payload = json.loads(line)
+            if isinstance(payload.get("source"), dict):
+                payload["source"] = SourceInfo(**payload["source"])
+            claims.append(Claim(**payload))
     filtered = []
     for claim in claims:
         if source_type and claim.source.type != source_type:

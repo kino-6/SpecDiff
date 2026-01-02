@@ -33,6 +33,46 @@ PDF を含むサンプルデータを生成し、抽出結果のサマリを出�
 
 ※ `facets.feature` は複数ラベルのため、合計件数は全クレーム数を超える場合があります。
 
+### 出力例
+
+```
+Generated 3 EML files in /path/to/SpecDiff/samples/input/mail
+Generated /path/to/SpecDiff/samples/input/sample.xlsx
+Generated /path/to/SpecDiff/samples/input/sample.pptx
+Generated /path/to/SpecDiff/samples/input/sample.pdf
+Wrote 18 claims to samples/output/claims.jsonl
+Counts by source.type:
+  pdf: 2
+  xlsx: 10
+  pptx: 3
+  eml: 3
+Counts by authority:
+  normative: 2
+  approved_interpretation: 9
+  informative: 7
+Counts by facets.feature:
+  brake: 6
+  can: 4
+  error_handling: 7
+  timing: 5
+  diagnostics: 5
+  safety: 7
+  calibration: 5
+  nvm: 4
+  init: 2
+  comms: 1
+Note: Counts by facets.feature is multi-label; totals can exceed total claims.
+Sample claims:
+TYPE: eml | CLM-BRAKE-000005 | samples/input/mail/mail1.eml | {...}
+  From: demo1@example.com To: team@example.com Date: Fri, 01 Mar 2024 10:00:00 +0000 ...
+TYPE: pdf | CLM-BRAKE-000001 | samples/input/sample.pdf | {...}
+  Brake controller shall support safe deceleration under normal conditions ...
+TYPE: pptx | CLM-BRAKE-000004 | samples/input/sample.pptx | {...}
+  [Slide 1] Brake Feature Overview ...
+TYPE: xlsx | CLM-BRAKE-000002 | samples/input/sample.xlsx | {...}
+  Question: How is brake torque limited? Answer: Via controller thresholds. ...
+```
+
 ## 検索
 
 ```bash
@@ -44,6 +84,12 @@ crossspec search --config samples/crossspec.yml --query "timing" --type pdf
 
 ```bash
 ./scripts/setup_demo.sh
+```
+
+## ワンコマンド実行スクリプト
+
+```bash
+./scripts/run_demo.sh
 ```
 
 ## Ollama によるタグ付け（任意）
