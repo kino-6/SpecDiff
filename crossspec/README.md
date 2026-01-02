@@ -79,6 +79,19 @@ crossspec search --config samples/crossspec.yml --feature brake --top 5
 crossspec search --config samples/crossspec.yml --query "timing" --type pdf
 ```
 
+## Code Assertions (code-extract)
+
+CrossSpec can extract code assertions (internally stored as Claims) from C/C++ and Python source files.
+
+```bash
+crossspec code-extract --repo . --out outputs/code_claims.jsonl
+crossspec search --claims outputs/code_claims.jsonl --query "init" --type code
+```
+
+Notes:
+- The UI uses the term “Assertion”, but the underlying records remain Claim objects.
+- C/C++ extraction is heuristic and best-effort (lightweight brace matching, no full AST).
+
 ## Optional setup script
 
 ```bash
