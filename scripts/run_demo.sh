@@ -9,6 +9,7 @@ cp crossspec/crossspec.yml.example crossspec.yml
 crossspec demo --config samples/crossspec.yml
 
 mkdir -p outputs
+rm -f outputs/code_claims.jsonl
 crossspec extract --config samples/crossspec.yml --save
 crossspec code-extract --repo . --out outputs/code_claims.jsonl --unit function --language python --top 5
 crossspec code-extract --repo . --out outputs/code_claims.jsonl --save

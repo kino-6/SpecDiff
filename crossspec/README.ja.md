@@ -92,6 +92,17 @@ crossspec search --config samples/crossspec.yml --query "timing" --type pdf
 ./scripts/run_demo.sh
 ```
 
+`run_demo.sh` は、サンプル生成と抽出に加えて、`outputs/code_claims.jsonl` へコード抽出も実行します。`code-extract` は既定で `outputs/` や `samples/output/` などの生成物ディレクトリを除外するため、生成済みの JSONL を再スキャンしません。
+
+## コード抽出（code-extract）
+
+```bash
+crossspec code-extract --repo . --out outputs/code_claims.jsonl --unit function --language python
+```
+
+- 既定の除外パターンにより、`outputs/`、`samples/output/`、`samples/input/`、`.ruff_cache/`、`.tox/` などの生成物はスキャン対象外です。
+- `--out` で指定した JSONL も自動的に除外されます。
+
 ## Ollama によるタグ付け（任意）
 
 Ollama の OpenAI 互換 API を使ってローカルでタグ付けできます。
