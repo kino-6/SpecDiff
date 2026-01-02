@@ -20,6 +20,11 @@ DEFAULT_EXCLUDES = [
     "**/node_modules/**",
     "**/.mypy_cache/**",
     "**/.pytest_cache/**",
+    "**/.ruff_cache/**",
+    "**/.tox/**",
+    "**/outputs/**",
+    "**/samples/output/**",
+    "**/samples/input/**",
 ]
 
 DEFAULT_INCLUDE_C = ["**/*.c", "**/*.h"]
@@ -36,8 +41,16 @@ LANGUAGE_EXTENSIONS = {
 @dataclass(frozen=True)
 class ScannedFile:
     path: Path
+    relative_path: str
     language: str
     is_header: bool
+
+
+@dataclass(frozen=True)
+class ScanSummary:
+    total_files_matched: int
+    skipped_excluded: int
+    skipped_too_large: int
 
 
 def default_includes(language: str) -> List[str]:
@@ -68,6 +81,25 @@ def scan_files(
     max_bytes: int,
     language_filter: str,
 ) -> List[ScannedFile]:
+    scanned, _summary = scan_files_with_summary(
+        repo_root=repo_root,
+        includes=includes,
+        excludes=excludes,
+        max_bytes=max_bytes,
+        language_filter=language_filter,
+    )
+    return scanned
+
+
+def scan_files_with_summary(
+    *,
+    repo_root: Path,
+    includes: Sequence[str],
+    excludes: Sequence[str],
+    max_bytes: int,
+    language_filter: str,
+) -> Tuple[List[ScannedFile], ScanSummary]:
+    repo_root = repo_root.resolve()
     matches: set[Path] = set()
     for pattern in includes:
         if Path(pattern).is_absolute():
@@ -78,20 +110,27 @@ def scan_files(
             matches.add(Path(match))
 
     scanned: List[ScannedFile] = []
-    for path in sorted(matches):
+    matched_files = 0
+    skipped_excluded = 0
+    skipped_too_large = 0
+    for path in sorted(matches, key=lambda item: item.as_posix()):
         if not path.is_file():
             continue
+        resolved_path = path.resolve()
         try:
-            rel_path = path.relative_to(repo_root).as_posix()
+            rel_path = resolved_path.relative_to(repo_root).as_posix()
         except ValueError:
-            rel_path = path.as_posix()
+            continue
+        matched_files += 1
         if _is_excluded(rel_path, excludes):
+            skipped_excluded += 1
             continue
         try:
             size = path.stat().st_size
         except OSError:
             continue
         if size > max_bytes:
+            skipped_too_large += 1
             continue
         language = detect_language(path)
         if not language:
@@ -99,12 +138,28 @@ def scan_files(
         if language_filter != "all" and language != language_filter:
             continue
         is_header = path.suffix.lower() in {".h", ".hpp", ".hh"}
-        scanned.append(ScannedFile(path=path, language=language, is_header=is_header))
-    return scanned
+        scanned.append(
+            ScannedFile(
+                path=resolved_path,
+                relative_path=rel_path,
+                language=language,
+                is_header=is_header,
+            )
+        )
+    summary = ScanSummary(
+        total_files_matched=matched_files,
+        skipped_excluded=skipped_excluded,
+        skipped_too_large=skipped_too_large,
+    )
+    return scanned, summary
 
 
 def _is_excluded(rel_path: str, excludes: Sequence[str]) -> bool:
-    return any(fnmatch.fnmatch(rel_path, pattern) for pattern in excludes)
+    anchored_path = f"/{rel_path}"
+    return any(
+        fnmatch.fnmatch(rel_path, pattern) or fnmatch.fnmatch(anchored_path, pattern)
+        for pattern in excludes
+    )
 
 
 def read_text_with_fallback(path: Path, encoding: str) -> Tuple[str, str]:
@@ -122,4 +177,3 @@ def iter_lines_slice(lines: List[str], line_start: int, line_end: int) -> str:
     start_index = max(line_start - 1, 0)
     end_index = min(line_end, len(lines))
     return "\n".join(lines[start_index:end_index])
-

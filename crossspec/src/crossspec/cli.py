@@ -20,7 +20,7 @@ from crossspec.code_extract import (
     extract_c_cpp_units,
     extract_python_units,
     read_text_with_fallback,
-    scan_files,
+    scan_files_with_summary,
 )
 from crossspec.io.jsonl import write_jsonl
 from crossspec.tagging import load_taxonomy
@@ -231,10 +231,10 @@ def code_extract_command(
     save: bool,
     top: Optional[int],
 ) -> None:
-    repo_root = Path(repo)
+    repo_root = Path(repo).resolve()
     if config and repo == ".":
         cfg = load_config(config)
-        repo_root = Path(cfg.project.repo_root)
+        repo_root = Path(cfg.project.repo_root).resolve()
     includes = include or default_includes(language)
     excludes = exclude or list(DEFAULT_EXCLUDES)
     output_path = Path(out)
@@ -247,7 +247,14 @@ def code_extract_command(
             print(message)
         return
 
-    scanned = scan_files(
+    try:
+        output_rel = output_path.resolve().relative_to(repo_root).as_posix()
+    except ValueError:
+        output_rel = None
+    if output_rel:
+        excludes = list(excludes) + [output_rel]
+
+    scanned, scan_summary = scan_files_with_summary(
         repo_root=repo_root,
         includes=includes,
         excludes=excludes,
@@ -264,20 +271,21 @@ def code_extract_command(
     authority_value = Authority(authority)
     status_value = Status(status)
     extracted_count = 0
+    decode_error_count = 0
     for entry in scanned:
         try:
             text, sha1 = read_text_with_fallback(entry.path, encoding)
+        except UnicodeDecodeError as exc:
+            decode_error_count += 1
+            print(f"Skipping {entry.path}: {exc}")
+            continue
         except OSError as exc:
             print(f"Skipping {entry.path}: {exc}")
             continue
-        try:
-            rel_path = entry.path.relative_to(repo_root).as_posix()
-        except ValueError:
-            rel_path = entry.path.as_posix()
         if entry.language == "python":
             extracted_units = extract_python_units(
                 path=entry.path,
-                source_path=rel_path,
+                source_path=entry.relative_path,
                 text=text,
                 unit=unit,
                 authority=authority_value,
@@ -286,7 +294,7 @@ def code_extract_command(
         else:
             extracted_units = extract_c_cpp_units(
                 path=entry.path,
-                source_path=rel_path,
+                source_path=entry.relative_path,
                 text=text,
                 unit=unit,
                 authority=authority_value,
@@ -320,6 +328,27 @@ def code_extract_command(
         typer.echo(message)
     else:
         print(message)
+    summary_message = (
+        "Summary: "
+        f"total_files_matched={scan_summary.total_files_matched}, "
+        "total_files_skipped("
+        f"excluded={scan_summary.skipped_excluded}, "
+        f"too_large={scan_summary.skipped_too_large}, "
+        f"decode_error={decode_error_count}"
+        "), "
+        f"total_units_extracted={extracted_count}"
+    )
+    if typer:
+        typer.echo(summary_message)
+    else:
+        print(summary_message)
+    if extracted_count == 0:
+        top_paths = ", ".join(entry.relative_path for entry in scanned[:5])
+        debug_message = f"Top scanned paths: {top_paths}" if top_paths else "Top scanned paths: (none)"
+        if typer:
+            typer.echo(debug_message)
+        else:
+            print(debug_message)
 
 
 def _category_from_language(language: str) -> str:
