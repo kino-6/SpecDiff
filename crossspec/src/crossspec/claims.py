@@ -71,7 +71,12 @@ class ClaimIdGenerator:
         return f"CLM-{category}-{self._counters[category]:06d}"
 
 
-def category_from_facets(facets: Optional[Dict[str, Any]]) -> str:
+def category_from_facets(
+    facets: Optional[Dict[str, Any]],
+    category_hint: Optional[str] = None,
+) -> str:
+    if category_hint:
+        return category_hint
     if facets and facets.get("feature"):
         feature = str(facets["feature"][0])
         sanitized = []
