@@ -1,0 +1,54 @@
+version: 1
+project:
+  name: "CrossSpec Sample Project"
+  repo_root: "projects/sample_pj"
+outputs:
+  claims_dir: "projects/sample_pj/outputs"
+  jsonl_filename: "claims.jsonl"
+knowledge_sources:
+  - name: "Sample Specs (PDF)"
+    type: pdf
+    authority: normative
+    paths:
+      - "projects/sample_pj/docs/spec/**/*.pdf"
+  - name: "Sample Q&A (XLSX)"
+    type: xlsx
+    authority: approved_interpretation
+    paths:
+      - "projects/sample_pj/docs/qa/**/*.xlsx"
+    xlsx:
+      tables:
+        - sheet: "Q&A"
+          text_columns: ["Question", "Answer", "Status", "Owner"]
+          authority_by:
+            Status:
+              Draft: informative
+              Approved: approved_interpretation
+  - name: "Sample Slides (PPTX)"
+    type: pptx
+    authority: informative
+    paths:
+      - "projects/sample_pj/docs/slides/**/*.pptx"
+    pptx:
+      unit: slide
+      include_notes: true
+  - name: "Sample Mail (EML)"
+    type: eml
+    authority: unverified
+    paths:
+      - "projects/sample_pj/docs/mail/**/*.eml"
+    mail:
+      include_headers: ["From", "To", "Date", "Subject", "Message-ID"]
+
+tagging:
+  # If you don't have Ollama running, set enabled: false.
+  enabled: true
+  provider: "llm"
+  taxonomy_path: "taxonomy/features.yaml"
+  llm:
+    model: "gpt-oss:20b"
+    base_url: "http://localhost:11434/v1"
+    api_key: "ollama"
+    temperature: 0.0
+  output:
+    facets_key: "facets"
