@@ -238,6 +238,8 @@ def code_extract_command(
     includes = include or default_includes(language)
     excludes = exclude or list(DEFAULT_EXCLUDES)
     output_path = Path(out)
+    if not output_path.is_absolute():
+        output_path = repo_root / output_path
     if save and output_path.exists() and not dry_run:
         count = _count_jsonl_lines(output_path)
         message = f"Using existing claims at {output_path} ({count} claims)"
@@ -328,8 +330,13 @@ def code_extract_command(
         typer.echo(message)
     else:
         print(message)
+    include_globs = ", ".join(includes) if includes else "(none)"
+    exclude_globs = ", ".join(excludes) if excludes else "(none)"
     summary_message = (
         "Summary: "
+        f"repo_root={repo_root}, "
+        f"include={include_globs}, "
+        f"exclude={exclude_globs}, "
         f"total_files_matched={scan_summary.total_files_matched}, "
         "total_files_skipped("
         f"excluded={scan_summary.skipped_excluded}, "

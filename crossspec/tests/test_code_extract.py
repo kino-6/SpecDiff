@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from crossspec.claims import Authority, ClaimIdGenerator, build_claim
@@ -213,6 +214,41 @@ int beta() {
     assert len(first_ids) == len(second_ids)
 
 
+def test_code_extract_summary_is_deterministic(tmp_path: Path, capsys) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "src").mkdir()
+    (repo_root / "src" / "alpha.py").write_text(
+        """
+def alpha():
+    return "alpha"
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (repo_root / "src" / "beta.py").write_text(
+        """
+def beta():
+    return "beta"
+""".lstrip(),
+        encoding="utf-8",
+    )
+    output_path = repo_root / "outputs" / "claims.jsonl"
+
+    first_total, first_extracted = _run_code_extract_and_capture_summary(
+        capsys,
+        repo_root,
+        output_path,
+    )
+    second_total, second_extracted = _run_code_extract_and_capture_summary(
+        capsys,
+        repo_root,
+        output_path,
+    )
+
+    assert first_total == second_total
+    assert first_extracted == second_extracted
+
+
 def test_output_directories_excluded_by_default(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -240,3 +276,37 @@ def _read_claim_ids(path: Path) -> list[str]:
         for line in path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+
+
+def _run_code_extract_and_capture_summary(
+    capsys,
+    repo_root: Path,
+    output_path: Path,
+) -> tuple[int, int]:
+    code_extract_command(
+        repo=str(repo_root),
+        config=None,
+        out=str(output_path),
+        include=None,
+        exclude=None,
+        unit="function",
+        max_bytes=1_000_000,
+        encoding="utf-8",
+        language="python",
+        authority="informative",
+        status="active",
+        dry_run=False,
+        save=False,
+        top=None,
+    )
+    output = capsys.readouterr().out
+    summary_line = next(line for line in output.splitlines() if line.startswith("Summary:"))
+    total_files = _extract_summary_value(summary_line, "total_files_matched")
+    extracted = _extract_summary_value(summary_line, "total_units_extracted")
+    return total_files, extracted
+
+
+def _extract_summary_value(line: str, key: str) -> int:
+    match = re.search(rf"{re.escape(key)}=(\d+)", line)
+    assert match is not None, f"Missing {key} in summary: {line}"
+    return int(match.group(1))
