@@ -23,6 +23,22 @@ crossspec extract --config crossspec.yml
 
 ## デモ（効果確認）
 
+### プロジェクトレベル評価デモ
+
+より実プロジェクトに近い評価用のワークスペースを `projects/sample_pj/` に用意しています。
+詳細は [projects/sample_pj/README.md](../projects/sample_pj/README.md) を参照してください。
+
+一括実行スクリプト:
+
+```bash
+./scripts/run_sample_pj.sh
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/run_sample_pj.ps1
+```
+
+
 ```bash
 uv pip install -e ./crossspec\[demo\]
 
