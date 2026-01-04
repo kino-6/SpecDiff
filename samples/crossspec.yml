@@ -3,19 +3,19 @@ project:
   name: "CrossSpec Demo"
   repo_root: "."
 outputs:
-  claims_dir: "samples/output"
+  claims_dir: "output"
   jsonl_filename: "claims.jsonl"
 knowledge_sources:
   - name: "Demo PDF"
     type: pdf
     authority: normative
     paths:
-      - "samples/input/**/*.pdf"
+      - "input/**/*.pdf"
   - name: "Demo XLSX"
     type: xlsx
     authority: approved_interpretation
     paths:
-      - "samples/input/**/*.xlsx"
+      - "input/**/*.xlsx"
     xlsx:
       tables:
         - sheet: "Q&A"
@@ -28,7 +28,7 @@ knowledge_sources:
     type: pptx
     authority: informative
     paths:
-      - "samples/input/**/*.pptx"
+      - "input/**/*.pptx"
     pptx:
       unit: slide
       include_notes: true
@@ -36,14 +36,14 @@ knowledge_sources:
     type: eml
     authority: approved_interpretation
     paths:
-      - "samples/input/mail/**/*.eml"
+      - "input/mail/**/*.eml"
     mail:
       include_headers: ["From", "To", "Date", "Subject", "Message-ID"]
 
 tagging:
   enabled: true
   provider: "llm"
-  taxonomy_path: "taxonomy/features.yaml"
+  taxonomy_path: "../taxonomy/features.yaml"
   llm:
     model: "gpt-oss:20b"
     base_url: "http://localhost:11434/v1"

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import glob
 from pathlib import Path
 import sys
 from typing import Iterable, List, Optional
@@ -23,6 +22,7 @@ from crossspec.code_extract import (
     scan_files_with_summary,
 )
 from crossspec.io.jsonl import write_jsonl
+from crossspec.paths import expand_paths, resolve_path, resolve_repo_root
 from crossspec.tagging import load_taxonomy
 
 if typer:
@@ -34,7 +34,14 @@ else:
 def extract_command(config: str, save: bool = False) -> None:
     """Extract claims from configured knowledge sources."""
     cfg = load_config(config)
-    output_path = Path(cfg.outputs.claims_dir) / cfg.outputs.jsonl_filename
+    config_path = Path(config)
+    repo_root = resolve_repo_root(config_path, cfg.project.repo_root)
+    output_path = _resolve_output_path(repo_root, cfg)
+    message = f"Resolved repo_root={repo_root} output_path={output_path}"
+    if typer:
+        typer.echo(message)
+    else:
+        print(message)
     if save and output_path.exists():
         count = _count_jsonl_lines(output_path)
         message = f"Using existing claims at {output_path} ({count} claims)"
@@ -43,7 +50,7 @@ def extract_command(config: str, save: bool = False) -> None:
         else:
             print(message)
         return
-    claims = list(_extract_claims(cfg))
+    claims = list(_extract_claims(cfg, repo_root=repo_root, config_path=config_path))
     write_jsonl(output_path, claims)
     message = f"Wrote {len(claims)} claims to {output_path}"
     if typer:
@@ -135,12 +142,21 @@ if typer:
         typer.echo("Analysis is not implemented yet.")
 
 
-def _extract_claims(cfg: CrossspecConfig) -> Iterable[Claim]:
-    repo_root = Path(cfg.project.repo_root)
+def _extract_claims(
+    cfg: CrossspecConfig,
+    *,
+    repo_root: Path,
+    config_path: Path,
+) -> Iterable[Claim]:
     tagger: Optional[object] = None
     facets_key = "facets"
     if cfg.tagging and cfg.tagging.enabled:
-        taxonomy = load_taxonomy(cfg.tagging.taxonomy_path)
+        taxonomy_path = _resolve_taxonomy_path(
+            repo_root=repo_root,
+            config_path=config_path,
+            taxonomy_path=cfg.tagging.taxonomy_path,
+        )
+        taxonomy = load_taxonomy(str(taxonomy_path))
         from crossspec.tagging.llm_tagger import LlmTagger
 
         tagger = LlmTagger(taxonomy=taxonomy, llm=cfg.tagging.llm)
@@ -149,7 +165,13 @@ def _extract_claims(cfg: CrossspecConfig) -> Iterable[Claim]:
     id_generator = ClaimIdGenerator()
 
     for source in cfg.knowledge_sources:
-        for path in _expand_paths(repo_root, source.paths):
+        expanded = _expand_paths(repo_root, source.paths)
+        message = f"Knowledge source '{source.name}': matched {len(expanded)} files"
+        if typer:
+            typer.echo(message)
+        else:
+            print(message)
+        for path in expanded:
             extractor = _build_extractor(source, path)
             for extracted in extractor.extract():
                 facets = None
@@ -173,15 +195,7 @@ def _extract_claims(cfg: CrossspecConfig) -> Iterable[Claim]:
 
 
 def _expand_paths(repo_root: Path, patterns: List[str]) -> List[Path]:
-    paths: List[Path] = []
-    for pattern in patterns:
-        if Path(pattern).is_absolute():
-            matches = glob.glob(pattern, recursive=True)
-        else:
-            matches = glob.glob(str(repo_root / pattern), recursive=True)
-        for match in matches:
-            paths.append(Path(match))
-    return sorted(set(paths))
+    return expand_paths(repo_root, patterns)
 
 
 def _build_extractor(source: KnowledgeSource, path: Path):
@@ -209,9 +223,31 @@ def _build_extractor(source: KnowledgeSource, path: Path):
     raise ValueError(f"Unsupported source type: {source.type}")
 
 
+def _resolve_output_path(repo_root: Path, cfg: CrossspecConfig) -> Path:
+    claims_dir = resolve_path(repo_root, cfg.outputs.claims_dir)
+    return claims_dir / cfg.outputs.jsonl_filename
+
+
+def _resolve_taxonomy_path(repo_root: Path, config_path: Path, taxonomy_path: str) -> Path:
+    resolved = resolve_path(repo_root, taxonomy_path)
+    if not resolved.exists():
+        message = (
+            "Taxonomy file not found. "
+            f"config_path={config_path.resolve()} "
+            f"repo_root={repo_root} "
+            f"taxonomy_path={taxonomy_path} "
+            f"resolved_path={resolved}"
+        )
+        raise FileNotFoundError(message)
+    return resolved
+
+
 def demo_command(config: str) -> None:
     cfg = load_config(config)
-    _run_demo(cfg)
+    config_path = Path(config)
+    repo_root = resolve_repo_root(config_path, cfg.project.repo_root)
+    output_path = _resolve_output_path(repo_root, cfg)
+    _run_demo(cfg, output_path=output_path, repo_root=repo_root, config_path=config_path)
 
 
 def code_extract_command(
@@ -234,7 +270,8 @@ def code_extract_command(
     repo_root = Path(repo).resolve()
     if config and repo == ".":
         cfg = load_config(config)
-        repo_root = Path(cfg.project.repo_root).resolve()
+        config_path = Path(config)
+        repo_root = resolve_repo_root(config_path, cfg.project.repo_root)
     includes = include or default_includes(language)
     excludes = exclude or list(DEFAULT_EXCLUDES)
     output_path = Path(out)
@@ -374,7 +411,7 @@ def _count_jsonl_lines(path: Path) -> int:
         return 0
 
 
-def _run_demo(cfg: CrossspecConfig) -> None:
+def _run_demo(cfg: CrossspecConfig, *, output_path: Path, repo_root: Path, config_path: Path) -> None:
     from collections import Counter
     import subprocess
 
@@ -384,14 +421,13 @@ def _run_demo(cfg: CrossspecConfig) -> None:
     else:
         print("samples/generate_samples.py not found; skipping sample generation.")
 
-    output_path = Path(cfg.outputs.claims_dir) / cfg.outputs.jsonl_filename
     pdf_expected = Path("samples/input/sample.pdf")
     if not pdf_expected.exists():
         raise RuntimeError(
             "Demo requires PDF sample generation. Install extras with "
             "`pip install -e \"./crossspec[demo]\"` (or `uv pip install -e ./crossspec[demo]`)."
         )
-    claims = list(_extract_claims(cfg))
+    claims = list(_extract_claims(cfg, repo_root=repo_root, config_path=config_path))
     write_jsonl(output_path, claims)
     print(f"Wrote {len(claims)} claims to {output_path}")
 
@@ -495,7 +531,9 @@ def search_command(
         if not config:
             raise ValueError("--config is required when --claims is not provided")
         cfg = load_config(config)
-        input_path = Path(cfg.outputs.claims_dir) / cfg.outputs.jsonl_filename
+        config_path = Path(config)
+        repo_root = resolve_repo_root(config_path, cfg.project.repo_root)
+        input_path = _resolve_output_path(repo_root, cfg)
     results = _search_claims(
         input_path=input_path,
         query=query,
