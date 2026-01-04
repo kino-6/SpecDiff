@@ -1,0 +1,8 @@
+From: Ada Example <ada@example.com>
+To: Brake Team <brake@example.com>
+Date: Mon, 01 Apr 2024 09:00:00 +0000
+Subject: Brake timing review
+Message-ID: <mail1@example.com>
+
+Please verify the brake timing budget before the next comms sync.
+Diagnostics should flag any timing drift beyond 5ms.

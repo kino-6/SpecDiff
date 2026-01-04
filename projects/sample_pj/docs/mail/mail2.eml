@@ -1,0 +1,8 @@
+From: Ben Example <ben@example.com>
+To: Safety Review <safety@example.com>
+Date: Tue, 02 Apr 2024 10:15:00 +0000
+Subject: CAN diagnostics update
+Message-ID: <mail2@example.com>
+
+CAN diagnostics now retry three times before error_handling triggers safe mode.
+We should confirm safety interlock behavior during init.

@@ -1,0 +1,8 @@
+From: Chloe Example <chloe@example.com>
+To: Calibration Ops <cal@example.com>
+Date: Wed, 03 Apr 2024 11:30:00 +0000
+Subject: NVM calibration process
+Message-ID: <mail3@example.com>
+
+Calibration offsets are stored in NVM with a signature.
+Please confirm comms messages include calibration status.
