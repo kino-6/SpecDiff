@@ -13,6 +13,20 @@ mini-project without mixing artifacts into the core repo.
 powershell -ExecutionPolicy Bypass -File projects/sample_pj/scripts/run_eval.ps1
 ```
 
+The eval scripts generate small sample PDFs/XLSX/PPTX files under `projects/sample_pj/docs/`
+before extraction. This avoids committing binary files to the repo.
+
+## Golden queries (expected to return results)
+
+```bash
+crossspec search --claims projects/sample_pj/outputs/claims.jsonl --feature brake
+crossspec search --claims projects/sample_pj/outputs/claims.jsonl --feature can
+crossspec search --claims projects/sample_pj/outputs/claims.jsonl --query timing
+crossspec search --claims projects/sample_pj/outputs/claims.jsonl --query calibration
+crossspec search --claims projects/sample_pj/outputs/claims.jsonl --query "retry"
+crossspec search --claims projects/sample_pj/outputs/code_claims.jsonl --query "init"
+```
+
 ## Tagging (Ollama)
 
 Tagging is enabled by default and expects a local Ollama server:

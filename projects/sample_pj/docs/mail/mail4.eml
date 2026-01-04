@@ -1,0 +1,8 @@
+From: Drew Example <drew@example.com>
+To: Diagnostics <diag@example.com>
+Date: Thu, 04 Apr 2024 13:45:00 +0000
+Subject: Error handling notes
+Message-ID: <mail4@example.com>
+
+Error_handling should log brake over-temperature events.
+Safety checks must block apply until diagnostics clear.

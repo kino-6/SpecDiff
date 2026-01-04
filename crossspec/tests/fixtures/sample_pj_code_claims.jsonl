@@ -1,0 +1,4 @@
+{"claim_id":"CLM-PY-000001","authority":"informative","text_raw":"def init_system(): pass","source":{"type":"code","path":"src/py/brake_tools.py"},"provenance":{"language":"python","symbol":"init_system"}}
+{"claim_id":"CLM-PY-000002","authority":"informative","text_raw":"def retry_comms(): pass","source":{"type":"code","path":"src/py/can_trace.py"},"provenance":{"language":"python","symbol":"retry_comms"}}
+{"claim_id":"CLM-C-000001","authority":"informative","text_raw":"void system_init(void);","source":{"type":"code","path":"src/cpp/src/init.c"},"provenance":{"language":"c","symbol":"system_init"}}
+{"claim_id":"CLM-CPP-000001","authority":"informative","text_raw":"void brake_init();","source":{"type":"code","path":"src/cpp/src/brake_controller.cpp"},"provenance":{"language":"cpp","symbol":"brake_init"}}

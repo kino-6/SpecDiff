@@ -65,27 +65,33 @@ def _select_spec_samples(claims: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return list(selected.values())
 
 
-def _select_code_samples(claims: List[Dict[str, Any]], limit: int = 3) -> List[Dict[str, Any]]:
-    selected: List[Dict[str, Any]] = []
-    seen_languages = set()
-    seen_symbols = set()
+def _select_code_samples(claims: List[Dict[str, Any]], limit: int = 4) -> List[Dict[str, Any]]:
+    python_samples: List[Dict[str, Any]] = []
+    c_family_samples: List[Dict[str, Any]] = []
+    other_samples: List[Dict[str, Any]] = []
+
     for claim in claims:
-        provenance = claim.get("provenance", {})
-        language = str(provenance.get("language", "unknown"))
-        symbol = str(provenance.get("symbol", ""))
-        if language not in seen_languages or (symbol and symbol not in seen_symbols):
-            selected.append(claim)
-            seen_languages.add(language)
-            if symbol:
-                seen_symbols.add(symbol)
-        if len(selected) >= limit:
-            return selected
-    for claim in claims:
-        if claim in selected:
-            continue
-        selected.append(claim)
+        language = str(claim.get("provenance", {}).get("language", "unknown")).lower()
+        if language == "python":
+            python_samples.append(claim)
+        elif language in {"c", "cpp", "c++", "cxx"}:
+            c_family_samples.append(claim)
+        else:
+            other_samples.append(claim)
+
+    selected = python_samples[:2] + c_family_samples[:2]
+
+    for claim in other_samples:
         if len(selected) >= limit:
             break
+        selected.append(claim)
+
+    for claim in claims:
+        if len(selected) >= limit:
+            break
+        if claim not in selected:
+            selected.append(claim)
+
     return selected
 
 
@@ -111,6 +117,22 @@ def _format_counter(counter: Counter) -> str:
     return "\n".join(f"- {key}: {value}" for key, value in counter.most_common())
 
 
+def _feature_count(claims: List[Dict[str, Any]], feature: str) -> int:
+    feature_lower = feature.lower()
+    total = 0
+    for claim in claims:
+        facets = claim.get("facets", {}) or {}
+        for item in _as_list(facets.get("feature")):
+            if str(item).lower() == feature_lower:
+                total += 1
+    return total
+
+
+def _query_count(claims: List[Dict[str, Any]], query: str) -> int:
+    query_lower = query.lower()
+    return sum(1 for claim in claims if query_lower in str(claim.get("text_raw", "")).lower())
+
+
 def build_report(claims_path: Path, code_claims_path: Path, output_path: Path) -> None:
     spec_claims = _read_jsonl(claims_path)
     code_claims = _read_jsonl(code_claims_path)
@@ -130,7 +152,34 @@ def build_report(claims_path: Path, code_claims_path: Path, output_path: Path) -
     timestamp = datetime.now(timezone.utc).isoformat()
 
     spec_samples = _select_spec_samples(spec_claims)
-    code_samples = _select_code_samples(code_claims, limit=3)
+    code_samples = _select_code_samples(code_claims, limit=4)
+
+    golden_queries = [
+        {
+            "command": "crossspec search --claims projects/sample_pj/outputs/claims.jsonl --feature brake",
+            "count": _feature_count(spec_claims, "brake"),
+        },
+        {
+            "command": "crossspec search --claims projects/sample_pj/outputs/claims.jsonl --feature can",
+            "count": _feature_count(spec_claims, "can"),
+        },
+        {
+            "command": "crossspec search --claims projects/sample_pj/outputs/claims.jsonl --query timing",
+            "count": _query_count(spec_claims, "timing"),
+        },
+        {
+            "command": "crossspec search --claims projects/sample_pj/outputs/claims.jsonl --query calibration",
+            "count": _query_count(spec_claims, "calibration"),
+        },
+        {
+            "command": "crossspec search --claims projects/sample_pj/outputs/claims.jsonl --query \"retry\"",
+            "count": _query_count(spec_claims, "retry"),
+        },
+        {
+            "command": "crossspec search --claims projects/sample_pj/outputs/code_claims.jsonl --query \"init\"",
+            "count": _query_count(code_claims, "init"),
+        },
+    ]
 
     lines = [
         "# CrossSpec Sample Project Report",
@@ -144,7 +193,7 @@ def build_report(claims_path: Path, code_claims_path: Path, output_path: Path) -
         _format_counter(source_counts),
         "- By authority:",
         _format_counter(authority_counts),
-        "- By facets.feature:",
+        "- By facets.feature (multi-label counts):",
         _format_counter(feature_counts),
         "",
         f"- Total code claims: {len(code_claims)}",
@@ -170,6 +219,16 @@ def build_report(claims_path: Path, code_claims_path: Path, output_path: Path) -
         lines.append(_format_samples(code_samples))
     else:
         lines.append("No code claims yet.")
+
+    lines.extend([
+        "",
+        "## Golden Queries (expected to return results)",
+        "",
+    ])
+
+    for entry in golden_queries:
+        status = "OK" if entry["count"] >= 1 else "MISSING"
+        lines.append(f"- `{entry['command']}` — {status} ({entry['count']} results)")
 
     lines.extend([
         "",

@@ -24,6 +24,9 @@ fi
 
 mkdir -p "${OUTPUT_DIR}"
 
+echo "[0/3] Generating sample documents..."
+python "${PROJECT_ROOT}/scripts/generate_docs.py"
+
 echo "[1/3] Extracting spec claims..."
 crossspec extract --config "${CONFIG_PATH}"
 
