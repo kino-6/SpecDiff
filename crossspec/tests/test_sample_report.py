@@ -9,6 +9,7 @@ def test_make_report_generates_summary(tmp_path: Path) -> None:
     claims_path = tmp_path / "claims.jsonl"
     code_claims_path = tmp_path / "code_claims.jsonl"
     report_path = tmp_path / "report.md"
+    details_path = tmp_path / "report_details.md"
 
     fixtures_dir = Path(__file__).resolve().parent / "fixtures"
     claims_path.write_text((fixtures_dir / "sample_pj_claims.jsonl").read_text(encoding="utf-8"), encoding="utf-8")
@@ -25,11 +26,14 @@ def test_make_report_generates_summary(tmp_path: Path) -> None:
             str(code_claims_path),
             "--out",
             str(report_path),
+            "--details",
+            str(details_path),
         ],
         check=True,
     )
 
     report = report_path.read_text(encoding="utf-8")
+    details = details_path.read_text(encoding="utf-8")
     assert "# CrossSpec Sample Project Report" in report
     assert "Total spec claims: 4" in report
     assert "- pdf: 1" in report
@@ -47,6 +51,12 @@ def test_make_report_generates_summary(tmp_path: Path) -> None:
     assert "- python: 2" in report
     assert "- c: 1" in report
     assert "- cpp: 1" in report
+    assert "Spec vs Code Trace Matrix" in report
+    assert "Evidence (readable excerpts)" in report
+    assert "Gaps" in report
     assert "Golden Queries (expected to return results)" in report
     assert "--query \"retry\"" in report
     assert "--query \"init\"" in report
+    assert "report_details.md#feature-timing" in report
+    assert "## feature: timing" in details
+    assert "feature-timing" in details

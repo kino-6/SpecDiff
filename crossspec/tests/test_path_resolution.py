@@ -139,7 +139,7 @@ def test_outputs_path_resolution_with_cwd_independence(tmp_path: Path, monkeypat
     assert _count_claims(output_path) == 1
 
 
-def test_tagging_taxonomy_path_resolution(tmp_path: Path) -> None:
+def test_tagging_taxonomy_path_resolution(tmp_path: Path, monkeypatch) -> None:
     config_dir = tmp_path / "cfg"
     repo_root = tmp_path / "repo"
     taxonomy_path = repo_root / "taxonomy" / "features.yaml"
@@ -183,6 +183,10 @@ def test_tagging_taxonomy_path_resolution(tmp_path: Path) -> None:
             facets_key: "facets"
         """,
     )
+
+    other_dir = tmp_path / "other"
+    other_dir.mkdir()
+    monkeypatch.chdir(other_dir)
 
     extract_command(str(config_path))
     output_path = repo_root / "outputs" / "claims.jsonl"

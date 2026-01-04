@@ -23,7 +23,7 @@ from crossspec.code_extract import (
 )
 from crossspec.io.jsonl import write_jsonl
 from crossspec.paths import expand_paths, resolve_path, resolve_repo_root
-from crossspec.tagging import load_taxonomy
+from crossspec.tagging import KeywordTagger, load_taxonomy
 
 if typer:
     app = typer.Typer(help="CrossSpec CLI")
@@ -148,19 +148,7 @@ def _extract_claims(
     repo_root: Path,
     config_path: Path,
 ) -> Iterable[Claim]:
-    tagger: Optional[object] = None
-    facets_key = "facets"
-    if cfg.tagging and cfg.tagging.enabled:
-        taxonomy_path = _resolve_taxonomy_path(
-            repo_root=repo_root,
-            config_path=config_path,
-            taxonomy_path=cfg.tagging.taxonomy_path,
-        )
-        taxonomy = load_taxonomy(str(taxonomy_path))
-        from crossspec.tagging.llm_tagger import LlmTagger
-
-        tagger = LlmTagger(taxonomy=taxonomy, llm=cfg.tagging.llm)
-        facets_key = cfg.tagging.output.facets_key
+    tagger, facets_key = _build_spec_tagger(cfg, repo_root=repo_root, config_path=config_path)
 
     id_generator = ClaimIdGenerator()
 
@@ -242,11 +230,66 @@ def _resolve_taxonomy_path(repo_root: Path, config_path: Path, taxonomy_path: st
     return resolved
 
 
+def _build_spec_tagger(
+    cfg: CrossspecConfig,
+    *,
+    repo_root: Path,
+    config_path: Path,
+) -> tuple[Optional[object], str]:
+    facets_key = cfg.tagging.output.facets_key if cfg.tagging else "facets"
+    if cfg.tagging and cfg.tagging.enabled:
+        taxonomy_path = _resolve_taxonomy_path(
+            repo_root=repo_root,
+            config_path=config_path,
+            taxonomy_path=cfg.tagging.taxonomy_path,
+        )
+        taxonomy = load_taxonomy(str(taxonomy_path))
+        from crossspec.tagging.llm_tagger import LlmTagger
+
+        return LlmTagger(taxonomy=taxonomy, llm=cfg.tagging.llm), facets_key
+    return None, facets_key
+
+
+def _build_code_tagger(
+    cfg: Optional[CrossspecConfig],
+    *,
+    repo_root: Path,
+    config_path: Optional[Path],
+) -> tuple[Optional[object], str]:
+    if not cfg:
+        return None, "facets"
+    facets_key = cfg.tagging.output.facets_key if cfg.tagging else "facets"
+    if cfg.tagging and cfg.tagging.enabled:
+        taxonomy_path = _resolve_taxonomy_path(
+            repo_root=repo_root,
+            config_path=config_path or repo_root,
+            taxonomy_path=cfg.tagging.taxonomy_path,
+        )
+        taxonomy = load_taxonomy(str(taxonomy_path))
+        from crossspec.tagging.llm_tagger import LlmTagger
+
+        return LlmTagger(taxonomy=taxonomy, llm=cfg.tagging.llm), facets_key
+    if cfg.tagging:
+        taxonomy_path = _resolve_taxonomy_path(
+            repo_root=repo_root,
+            config_path=config_path or repo_root,
+            taxonomy_path=cfg.tagging.taxonomy_path,
+        )
+        taxonomy = load_taxonomy(str(taxonomy_path))
+        return KeywordTagger(taxonomy=taxonomy), facets_key
+    return None, facets_key
+
+
 def demo_command(config: str) -> None:
     cfg = load_config(config)
     config_path = Path(config)
     repo_root = resolve_repo_root(config_path, cfg.project.repo_root)
     output_path = _resolve_output_path(repo_root, cfg)
+    message = f"Resolved repo_root={repo_root} output_path={output_path}"
+    if typer:
+        typer.echo(message)
+    else:
+        print(message)
     _run_demo(cfg, output_path=output_path, repo_root=repo_root, config_path=config_path)
 
 
@@ -268,15 +311,20 @@ def code_extract_command(
     top: Optional[int],
 ) -> None:
     repo_root = Path(repo).resolve()
-    if config and repo == ".":
+    cfg: Optional[CrossspecConfig] = None
+    config_path: Optional[Path] = None
+    if config:
         cfg = load_config(config)
         config_path = Path(config)
         repo_root = resolve_repo_root(config_path, cfg.project.repo_root)
     includes = include or default_includes(language)
     excludes = exclude or list(DEFAULT_EXCLUDES)
-    output_path = Path(out)
-    if not output_path.is_absolute():
-        output_path = repo_root / output_path
+    output_path = resolve_path(repo_root, out)
+    message = f"Resolved repo_root={repo_root} output_path={output_path}"
+    if typer:
+        typer.echo(message)
+    else:
+        print(message)
     if save and output_path.exists() and not dry_run:
         count = _count_jsonl_lines(output_path)
         message = f"Using existing claims at {output_path} ({count} claims)"
@@ -306,6 +354,7 @@ def code_extract_command(
         return
 
     id_generator = ClaimIdGenerator()
+    tagger, facets_key = _build_code_tagger(cfg, repo_root=repo_root, config_path=config_path)
     claims: List[Claim] = []
     authority_value = Authority(authority)
     status_value = Status(status)
@@ -345,6 +394,10 @@ def code_extract_command(
             category_hint = _category_from_language(entry.language)
             category = category_from_facets(None, category_hint=category_hint)
             claim_id = id_generator.next_id(category)
+            facets_payload = None
+            if tagger:
+                facets = tagger.tag(extracted.text_raw)
+                facets_payload = facets if facets_key == "facets" else {facets_key: facets}
             claim = build_claim(
                 claim_id=claim_id,
                 authority=authority_value,
@@ -352,6 +405,7 @@ def code_extract_command(
                 source_type=extracted.source_type,
                 source_path=extracted.source_path,
                 provenance=extracted.provenance,
+                facets=facets_payload,
                 status=status_value,
             )
             claims.append(claim)
@@ -534,6 +588,8 @@ def search_command(
         config_path = Path(config)
         repo_root = resolve_repo_root(config_path, cfg.project.repo_root)
         input_path = _resolve_output_path(repo_root, cfg)
+        message = f"Resolved repo_root={repo_root} output_path={input_path}"
+        print(message)
     results = _search_claims(
         input_path=input_path,
         query=query,
