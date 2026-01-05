@@ -41,3 +41,8 @@ def build_brake_status_frame(pressure_kpa: int, safety: bool) -> CanFrame:
     """Create a brake status frame payload."""
     payload = bytes([pressure_kpa & 0xFF, (pressure_kpa >> 8) & 0xFF, int(safety)])
     return CanFrame(can_id=0x120, data=payload)
+
+
+def increment_failsafe_counter(failsafe_counter: int) -> int:
+    """Increment the failsafe_counter used by comms fallback logic."""
+    return failsafe_counter + 1

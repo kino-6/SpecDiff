@@ -1,5 +1,5 @@
 version: 1
 facet_keys: [feature, artifact, component]
-feature: [brake, error_handling, can, init, diagnostics, comms, timing, safety, nvm, calibration]
+feature: [brake, error_handling, can, init, diagnostics, comms, timing, safety, nvm, calibration, watchdog, failsafe_counter]
 artifact: [spec, qa, design, decision, test, note]
 component: [BrakeController, ErrorHandler, CanIf, NvM, DiagnosticsManager]
