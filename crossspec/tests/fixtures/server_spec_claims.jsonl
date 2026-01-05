@@ -1,0 +1,2 @@
+{"claim_id":"CLM-BRAKE-000001","authority":"normative","text_raw":"Brake controller shall log overheat faults.","source":{"type":"pdf","path":"specs/brake.pdf"},"provenance":{"page":3},"facets":{"feature":["brake","fault"]}}
+{"claim_id":"CLM-COMMS-000001","authority":"normative","text_raw":"CAN retries shall be limited to 3 attempts.","source":{"type":"pdf","path":"specs/comms.pdf"},"provenance":{"page":2},"facets":{"feature":["comms"]}}

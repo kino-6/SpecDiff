@@ -21,6 +21,10 @@ dependencies = [
 demo = [
   "reportlab>=4.0.0",
 ]
+server = [
+  "fastapi>=0.110.0",
+  "uvicorn>=0.27.0",
+]
 
 [project.scripts]
 crossspec = "crossspec.cli:main"

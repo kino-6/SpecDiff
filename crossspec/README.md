@@ -110,6 +110,22 @@ Notes:
 - The UI uses the term “Assertion”, but the underlying records remain Claim objects.
 - C/C++ extraction is heuristic and best-effort (lightweight brace matching, no full AST).
 
+## CrossSpec Server architecture
+
+CrossSpec Server follows a clean architecture split:
+
+- **Domain** (`crossspec.domain`): core models + ports (no web dependencies).
+- **Use-cases** (`crossspec.usecases`): orchestrate domain logic through ports.
+- **Adapters**:
+  - Infrastructure (`crossspec.infra`) for JSONL storage, scoring, fallback retrieval, trace engine, planner stub.
+  - API styles (`crossspec.api.rest`, `crossspec.api.openwebui`) for REST and OpenWebUI tool routes.
+
+To add a new API style, create a new module under `crossspec.api.<style>` and reuse the
+use-cases via the composition root in `crossspec.server.wire`.
+
+To add vector retrieval later, implement `RetrieverPort` and replace the retriever wiring
+in `crossspec.server.wire` (no changes to use-cases required).
+
 ## Optional setup script
 
 ```bash
