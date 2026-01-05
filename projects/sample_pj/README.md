@@ -16,6 +16,23 @@ powershell -ExecutionPolicy Bypass -File projects/sample_pj/scripts/run_eval.ps1
 The eval scripts generate small sample PDFs/XLSX/PPTX files under `projects/sample_pj/docs/`
 before extraction. This avoids committing binary files to the repo.
 
+## Serve (OpenWebUI tool API)
+
+```bash
+bash scripts/run_sample_pj.sh
+```
+
+```bash
+crossspec serve --config projects/sample_pj/crossspec.pj.yml --api openwebui --port 8080
+```
+
+Example tool call:
+
+```bash
+curl -X POST http://localhost:8080/tools/trace -H 'Content-Type: application/json' \\
+  -d '{"spec_claim_id":"CLM-BRAKE-000001","top":3}'
+```
+
 ## Golden queries (expected to return results)
 
 ```bash

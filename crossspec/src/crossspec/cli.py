@@ -23,6 +23,7 @@ from crossspec.code_extract import (
 )
 from crossspec.io.jsonl import write_jsonl
 from crossspec.paths import expand_paths, resolve_path, resolve_repo_root
+from crossspec.server.wire import build_services, resolve_claim_paths
 from crossspec.tagging import KeywordTagger, load_taxonomy
 
 if typer:
@@ -49,6 +50,48 @@ def extract_command(config: str, save: bool = False) -> None:
             typer.echo(message)
         else:
             print(message)
+
+
+def serve_command(config: str, host: str, port: int, api: str) -> None:
+    cfg = load_config(config)
+    config_path = Path(config)
+    paths = resolve_claim_paths(config_path, cfg)
+    repo_root = resolve_repo_root(config_path, cfg.project.repo_root)
+    outputs_dir = resolve_path(repo_root, cfg.outputs.claims_dir)
+    message = (
+        "Resolved server paths: "
+        f"repo_root={repo_root} outputs_dir={outputs_dir} "
+        f"spec_claims_path={paths.spec_claims_path} "
+        f"code_claims_path={paths.code_claims_path} "
+        f"test_claims_path={paths.test_claims_path or 'N/A'}"
+    )
+    if typer:
+        typer.echo(message)
+    else:
+        print(message)
+    if _missing_server_deps():
+        raise RuntimeError(
+            "Server dependencies missing. Install with: "
+            'uv pip install -e "crossspec[server]"'
+        )
+    import uvicorn
+
+    services = build_services(config_path, cfg, paths)
+    if api == "rest":
+        from crossspec.api.rest.app import create_app
+    elif api == "openwebui":
+        from crossspec.api.openwebui.app import create_app
+    else:
+        raise ValueError("Unknown API style. Use 'rest' or 'openwebui'.")
+
+    app_instance = create_app(services)
+    uvicorn.run(app_instance, host=host, port=port)
+
+
+def _missing_server_deps() -> bool:
+    import importlib.util
+
+    return importlib.util.find_spec("uvicorn") is None or importlib.util.find_spec("fastapi") is None
         return
     claims = list(_extract_claims(cfg, repo_root=repo_root, config_path=config_path))
     write_jsonl(output_path, claims)
@@ -95,6 +138,15 @@ if typer:
             show_provenance=show_provenance,
             show_source=show_source,
         )
+
+    @app.command()
+    def serve(
+        config: str = typer.Option(..., "--config", help="Path to config YAML"),
+        host: str = typer.Option("0.0.0.0", "--host", help="Bind host"),
+        port: int = typer.Option(8080, "--port", help="Bind port"),
+        api: str = typer.Option("rest", "--api", help="API style (rest|openwebui)"),
+    ) -> None:
+        serve_command(config, host=host, port=port, api=api)
 
     @app.command(name="code-extract")
     def code_extract(
@@ -712,6 +764,11 @@ def main() -> None:
     code_extract_parser.add_argument("--dry-run", action="store_true", help="Print matched files")
     code_extract_parser.add_argument("--save", action="store_true", help="Reuse existing output if present")
     code_extract_parser.add_argument("--top", type=int, default=None, help="Limit number of units extracted")
+    serve_parser = subparsers.add_parser("serve", help="Run CrossSpec server")
+    serve_parser.add_argument("--config", required=True, help="Path to config YAML")
+    serve_parser.add_argument("--host", default="0.0.0.0", help="Bind host")
+    serve_parser.add_argument("--port", type=int, default=8080, help="Bind port")
+    serve_parser.add_argument("--api", default="rest", help="API style (rest|openwebui)")
     subparsers.add_parser("index", help="Indexing (not implemented)")
     subparsers.add_parser("analyze", help="Analysis (not implemented)")
     args = parser.parse_args()
@@ -748,6 +805,8 @@ def main() -> None:
             save=args.save,
             top=args.top,
         )
+    elif args.command == "serve":
+        serve_command(args.config, host=args.host, port=args.port, api=args.api)
     elif args.command == "index":
         print("Indexing is not implemented yet.")
     elif args.command == "analyze":

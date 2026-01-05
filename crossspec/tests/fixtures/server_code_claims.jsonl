@@ -1,0 +1,1 @@
+{"claim_id":"CLM-CODE-000001","authority":"informative","text_raw":"def log_overheat_fault(): pass","source":{"type":"code","path":"src/brake/diagnostics.py"},"provenance":{"symbol":"log_overheat_fault","line_start":10,"line_end":12},"facets":{"feature":["brake","fault"]}}
