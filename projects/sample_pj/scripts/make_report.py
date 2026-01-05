@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,16 +39,65 @@ def _compact_json(data: Dict[str, Any]) -> str:
     return json.dumps(data, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
-def _format_excerpt(text: str, limit: int = MAX_EVIDENCE_CHARS) -> str:
+def _truncate_by_lines(text: str, limit: int) -> Tuple[str, int]:
     if len(text) <= limit:
-        return text
-    return f"{text[:limit]}\n(truncated)"
+        return text, 0
+    lines = text.splitlines(keepends=True)
+    kept: List[str] = []
+    total = 0
+    for line in lines:
+        if kept and total + len(line) > limit:
+            break
+        kept.append(line)
+        total += len(line)
+        if total >= limit:
+            break
+    if not kept and lines:
+        kept.append(lines[0])
+        total = len(lines[0])
+    omitted_lines = max(0, len(lines) - len(kept))
+    return "".join(kept).rstrip("\n"), omitted_lines
+
+
+def _truncate_on_sentence(text: str, limit: int) -> Tuple[str, int]:
+    if len(text) <= limit:
+        return text, 0
+    last_end = None
+    for match in re.finditer(r"[.!?](?:\s|$)", text):
+        if match.end() <= limit:
+            last_end = match.end()
+        else:
+            break
+    if last_end:
+        truncated = text[:last_end].rstrip()
+        omitted_chars = max(0, len(text) - len(truncated))
+        return truncated, omitted_chars
+    return "", 0
+
+
+def _format_truncated_lines(text: str, limit: int) -> str:
+    truncated, omitted_lines = _truncate_by_lines(text, limit)
+    if omitted_lines <= 0:
+        return truncated
+    return f"{truncated}\n(truncated: omitted {omitted_lines} lines)"
+
+
+def _format_truncated_text(text: str, limit: int) -> str:
+    truncated, omitted_chars = _truncate_on_sentence(text, limit)
+    if omitted_chars > 0:
+        return f"{truncated} (truncated: omitted ~{omitted_chars} chars)"
+    truncated, omitted_lines = _truncate_by_lines(text, limit)
+    if omitted_lines <= 0:
+        return truncated
+    return f"{truncated}\n(truncated: omitted {omitted_lines} lines)"
+
+
+def _format_excerpt(text: str, limit: int = MAX_EVIDENCE_CHARS) -> str:
+    return _format_truncated_lines(text, limit)
 
 
 def _format_full_text(text: str, limit: int = MAX_DETAIL_CHARS) -> str:
-    if len(text) <= limit:
-        return text
-    return f"{text[:limit]}\n(truncated)"
+    return _format_truncated_lines(text, limit)
 
 
 def _count_by(items: Iterable[Dict[str, Any]], key_path: List[str], default: str) -> Counter:
@@ -117,7 +167,7 @@ def _format_samples(samples: List[Dict[str, Any]]) -> str:
                 claim_id,
                 source_path,
                 _compact_json(provenance),
-                _format_excerpt(text_raw, limit=160).replace("\n", " "),
+                _format_truncated_text(text_raw, limit=160).replace("\n", " "),
             )
         )
     return "\n".join(lines)
@@ -402,7 +452,9 @@ def build_report(
     ]
 
     for row in matrix_rows:
-        lines.append(f"| {row['feature']} | {row['spec_count']} | {row['code_count']} | {row['status']} |")
+        anchor = _sanitize_anchor(row["feature"])
+        feature_link = f"[{row['feature']}](report_details.md#feature-{anchor})"
+        lines.append(f"| {feature_link} | {row['spec_count']} | {row['code_count']} | {row['status']} |")
 
     lines.extend([
         "",

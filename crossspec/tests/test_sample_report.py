@@ -47,16 +47,24 @@ def test_make_report_generates_summary(tmp_path: Path) -> None:
     assert "By facets.feature (multi-label counts):" in report
     assert "- brake: 1" in report
     assert "- timing: 1" in report
+    assert "- watchdog: 1" in report
     assert "Total code claims: 4" in report
     assert "- python: 2" in report
     assert "- c: 1" in report
     assert "- cpp: 1" in report
     assert "Spec vs Code Trace Matrix" in report
+    assert "[timing](report_details.md#feature-timing)" in report
     assert "Evidence (readable excerpts)" in report
     assert "Gaps" in report
+    assert "### Spec-only features" in report
+    assert "- watchdog: 1" in report
+    assert "### Code-only features" in report
+    assert "- failsafe_counter: 1" in report
     assert "Golden Queries (expected to return results)" in report
     assert "--query \"retry\"" in report
     assert "--query \"init\"" in report
     assert "report_details.md#feature-timing" in report
+    assert "source.path**: src/" in report
+    assert "scripts/" not in report
     assert "## feature: timing" in details
     assert "feature-timing" in details

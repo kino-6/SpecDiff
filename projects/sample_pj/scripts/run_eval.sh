@@ -54,7 +54,7 @@ fi
 echo "[2/3] Extracting code claims..."
 crossspec code-extract \
   --config "${CONFIG_PATH}" \
-  --repo "${PROJECT_ROOT}" \
+  --repo "${PROJECT_ROOT}/src" \
   --unit function \
   --out "${OUTPUT_DIR}/code_claims.jsonl"
 
