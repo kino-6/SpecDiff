@@ -25,6 +25,10 @@ class PlanRequest(BaseModel):
 def create_app(services: ServiceBundle) -> FastAPI:
     app = FastAPI(title="CrossSpec Server (OpenWebUI)")
 
+    @app.get("/healthz")
+    def healthz() -> Dict[str, str]:
+        return {"status": "ok"}
+
     @app.post("/tools/trace")
     def trace_tool(payload: TraceRequest) -> Dict[str, Any]:
         trace = services.trace_claim(payload.spec_claim_id, top_k=payload.top)
