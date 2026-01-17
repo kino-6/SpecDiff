@@ -1,4 +1,4 @@
-.PHONY: smoke demo
+.PHONY: smoke demo eval-server
 
 smoke:
 	PYTHONPATH=crossspec/src python -m crossspec.cli extract --config crossspec/samples/crossspec.yml
@@ -6,3 +6,6 @@ smoke:
 
 demo:
 	PYTHONPATH=crossspec/src python -m crossspec.cli demo --config samples/crossspec.yml
+
+eval-server:
+	bash scripts/eval_server_sample_pj.sh
