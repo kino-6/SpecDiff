@@ -50,6 +50,14 @@ def extract_command(config: str, save: bool = False) -> None:
             typer.echo(message)
         else:
             print(message)
+        return
+    claims = list(_extract_claims(cfg, repo_root=repo_root, config_path=config_path))
+    write_jsonl(output_path, claims)
+    message = f"Wrote {len(claims)} claims to {output_path}"
+    if typer:
+        typer.echo(message)
+    else:
+        print(message)
 
 
 def serve_command(config: str, host: str, port: int, api: str) -> None:
@@ -92,14 +100,6 @@ def _missing_server_deps() -> bool:
     import importlib.util
 
     return importlib.util.find_spec("uvicorn") is None or importlib.util.find_spec("fastapi") is None
-        return
-    claims = list(_extract_claims(cfg, repo_root=repo_root, config_path=config_path))
-    write_jsonl(output_path, claims)
-    message = f"Wrote {len(claims)} claims to {output_path}"
-    if typer:
-        typer.echo(message)
-    else:
-        print(message)
 
 
 if typer:
